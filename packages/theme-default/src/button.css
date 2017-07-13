@@ -10,6 +10,7 @@
     cursor: pointer;
     background: var(--button-default-fill);
     border: var(--border-base);
+    border-color: var(--button-default-border);
     color: var(--button-default-color);
     -webkit-appearance: none;
     text-align: center;
@@ -17,10 +18,14 @@
     outline: none;
     margin: 0;
     @utils-user-select none;
+    & + .el-button {
+      margin-left: 10px;
+    }
     
     @mixin button-size var(--button-padding-vertical), var(--button-padding-horizontal), var(--button-font-size), var(--button-border-radius);
 
-    &:hover {
+    &:hover,
+    &:focus {
       color: var(--color-primary);
       border-color: @color;
     }
@@ -35,30 +40,22 @@
       border: 0;
     }
 
-    & .el-icon-right {
-      margin-left: 5px;
-    }
-    & .el-icon-left {
-      margin-right: 5px;
-    }
-
     & [class*="el-icon-"] {
-      /*line-height: 0.9;*/
-      
       & + span {
         margin-left: 5px;
       }
     }
 
     @when plain {
-      &:hover {
-        background: #fff;
+      &:hover,
+      &:focus {
+        background: var(--color-white);
         border-color: var(--color-primary);
         color: var(--color-primary);
       }
       
       &:active {
-        background: #fff;
+        background: var(--color-white);
         border-color: shade(var(--color-primary), var(--button-active-shade-percent));
         color: shade(var(--color-primary), var(--button-active-shade-percent));
         outline: none;
@@ -72,7 +69,8 @@
 
     @when disabled {
       &,
-      &:hover {
+      &:hover,
+      &:focus {
         color: var(--button-disabled-color);
         cursor: not-allowed;
         background-image: none;
@@ -80,12 +78,17 @@
         border-color: var(--button-disabled-border);
       }
 
+      &.el-button--text {
+        background-color: transparent;
+      }
+
       &.is-plain {
         &,
-        &:hover {
-          background-color: #fff;
-          border-color: #d3dce6;
-          color: #C0CCDA;
+        &:hover,
+        &:focus {
+          background-color: var(--color-white);
+          border-color: var(--color-base-gray);
+          color: var(--color-extra-light-silver);
         }
       }
     }
@@ -106,53 +109,58 @@
         background-color: rgba(255,255,255,.35);
       }
     }
-  }
-
-  @b button-primary {
-    @mixin button-variant var(--button-primary-color), var(--button-primary-fill), var(--button-primary-border);
-  }
-  @b button-success {
-    @mixin button-variant var(--button-success-color), var(--button-success-fill), var(--button-success-border);
-  }
-  @b button-warning {
-    @mixin button-variant var(--button-warning-color), var(--button-warning-fill), var(--button-warning-border);
-  }
-  @b button-danger {
-    @mixin button-variant var(--button-danger-color), var(--button-danger-fill), var(--button-danger-border);
-  }
-  @b button-info {
-    @mixin button-variant var(--button-info-color), var(--button-info-fill), var(--button-info-border);
-  }
-  @b button-text {
-    border: none;
-    color: var(--color-primary);
-    background: transparent;
-
-    &:hover {
-      color: tint(var(--color-primary), var(--button-hover-tint-percent));
+    @m primary {
+      @mixin button-variant var(--button-primary-color), var(--button-primary-fill), var(--button-primary-border);
     }
-    &:active {
-      color: shade(var(--color-primary), var(--button-active-shade-percent));
+    @m success {
+      @mixin button-variant var(--button-success-color), var(--button-success-fill), var(--button-success-border);
     }
-  }
+    @m warning {
+      @mixin button-variant var(--button-warning-color), var(--button-warning-fill), var(--button-warning-border);
+    }
+    @m danger {
+      @mixin button-variant var(--button-danger-color), var(--button-danger-fill), var(--button-danger-border);
+    }
+    @m info {
+      @mixin button-variant var(--button-info-color), var(--button-info-fill), var(--button-info-border);
+    }
+    @m large {
+      @mixin button-size var(--button-large-padding-vertical), var(--button-large-padding-horizontal), var(--button-large-font-size), var(--button-border-radius);
+    }
+    @m small {
+      @mixin button-size var(--button-small-padding-vertical), var(--button-small-padding-horizontal), var(--button-small-font-size), var(--button-border-radius);
+    }
+    @m mini {
+      @mixin button-size var(--button-mini-padding-vertical), var(--button-mini-padding-horizontal), var(--button-mini-font-size), var(--button-border-radius);
+    }
+    @m text {
+      border: none;
+      color: var(--color-primary);
+      background: transparent;
+      padding-left: 0;
+      padding-right: 0;
 
-  @b button-large {
-    @mixin button-size var(--button-large-padding-vertical), var(--button-large-padding-horizontal), var(--button-large-font-size), var(--button-border-radius);
-  }
-  @b button-small {
-    @mixin button-size var(--button-small-padding-vertical), var(--button-small-padding-horizontal), var(--button-small-font-size), var(--button-border-radius);
-  }
-  @b button-mini {
-    @mixin button-size var(--button-mini-padding-vertical), var(--button-mini-padding-horizontal), var(--button-mini-font-size), var(--button-border-radius);
+      &:hover,
+      &:focus {
+        color: tint(var(--color-primary), var(--button-hover-tint-percent));
+      }
+      &:active {
+        color: shade(var(--color-primary), var(--button-active-shade-percent));
+      }
+    }
   }
 
   @b button-group {
     @utils-clearfix;
     display: inline-block;
+    vertical-align: middle;
 
     & .el-button {
       float: left;
       position: relative;
+      & + .el-button {
+        margin-left: 0;
+      }
 
       &:first-child {
         border-top-right-radius: 0;
@@ -170,6 +178,7 @@
       }
 
       &:hover,
+      &:focus,
       &:active {
         z-index: 1;
       }
@@ -180,16 +189,16 @@
     }
 
     @each $type in (primary, success, warning, danger, info) {
-      .el-button-$type {
+      .el-button--$type {
         &:first-child {
-          border-right-color: rgba(#fff, 0.5);
+          border-right-color: rgba(var(--color-white), 0.5);
         }
         &:last-child {
-          border-left-color: rgba(#fff, 0.5);
+          border-left-color: rgba(var(--color-white), 0.5);
         }
         &:not(:first-child):not(:last-child) {
-          border-left-color: rgba(#fff, 0.5);
-          border-right-color: rgba(#fff, 0.5);
+          border-left-color: rgba(var(--color-white), 0.5);
+          border-right-color: rgba(var(--color-white), 0.5);
         }
       }
     }

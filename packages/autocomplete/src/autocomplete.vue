@@ -1,137 +1,186 @@
 <template>
-  <div class="el-autocomplete" v-clickoutside="handleBlur">
+  <div class="el-autocomplete">
     <el-input
+      ref="input"
       :value="value"
       :disabled="disabled"
       :placeholder="placeholder"
-      :name='name'
-      @onchange="handleChange"
-      @onfocus="handleFocus"
-      @keydown.up.native="highlight(highlightedIndex - 1)"
-      @keydown.down.native="highlight(highlightedIndex + 1)"
-      @keydown.enter.native="select(highlightedIndex)"
-    ></el-input>
-    <transition name="md-fade-bottom">
-      <ul
-        v-if="suggestionVisible"
-        class="el-autocomplete__suggestions"
-        :class="{ 'is-loading': loading }"
-        ref="suggestions"
-      >
-        <li v-if="loading"><i class="el-icon-loading"></i></li>
-        <template v-for="(item, index) in suggestions" v-else>
-          <li
-            v-if="!customItem"
-            :class="{'highlighted': highlightedIndex === index}"
-            @click="select(index)"
-          >
-            {{item.value}}
-          </li>
-          <component
-            v-else
-            :class="{'highlighted': highlightedIndex === index}"
-            @click="select(index)"
-            :is="customItem"
-            :item="item"
-            :index="index">
-          </component>
-        </template>
-      </ul>
-    </transition>
+      :name="name"
+      :size="size"
+      :icon="icon"
+      :on-icon-click="onIconClick"
+      @compositionstart.native="handleComposition"
+      @compositionupdate.native="handleComposition"
+      @compositionend.native="handleComposition"
+      @change="handleChange"
+      @focus="handleFocus"
+      @blur="handleBlur"
+      @keydown.up.native.prevent="highlight(highlightedIndex - 1)"
+      @keydown.down.native.prevent="highlight(highlightedIndex + 1)"
+      @keydown.enter.native.prevent="handleKeyEnter"
+    >
+      <template slot="prepend" v-if="$slots.prepend">
+        <slot name="prepend"></slot>
+      </template>
+      <template slot="append" v-if="$slots.append">
+        <slot name="append"></slot>
+      </template>
+    </el-input>
+    <el-autocomplete-suggestions
+      :props="props"
+      :class="[popperClass ? popperClass : '']"
+      ref="suggestions"
+      :suggestions="suggestions"
+    >
+    </el-autocomplete-suggestions>
   </div>
 </template>
 <script>
-  import ElInput from 'packages/input/index.js';
-  import Vue from 'vue';
-  import VueClickoutside from 'main/utils/clickoutside';
-  Vue.use(VueClickoutside);
+  import ElInput from 'element-ui/packages/input';
+  import ElAutocompleteSuggestions from './autocomplete-suggestions.vue';
+  import Emitter from 'element-ui/src/mixins/emitter';
 
   export default {
     name: 'ElAutocomplete',
 
+    mixins: [Emitter],
+
+    componentName: 'ElAutocomplete',
+
     components: {
-      ElInput
+      ElInput,
+      ElAutocompleteSuggestions
     },
+
     props: {
+      props: {
+        type: Object,
+        default() {
+          return {
+            label: 'value',
+            value: 'value'
+          };
+        }
+      },
+      popperClass: String,
       placeholder: String,
       disabled: Boolean,
       name: String,
+      size: String,
       value: String,
+      autofocus: Boolean,
       fetchSuggestions: Function,
       triggerOnFocus: {
         type: Boolean,
         default: true
       },
-      customItem: String
+      customItem: String,
+      icon: String,
+      onIconClick: Function
     },
     data() {
       return {
+        isFocus: false,
+        isOnComposition: false,
         suggestions: [],
-        suggestionVisible: false,
         loading: false,
         highlightedIndex: -1
       };
     },
+    computed: {
+      suggestionVisible() {
+        const suggestions = this.suggestions;
+        let isValidData = Array.isArray(suggestions) && suggestions.length > 0;
+        return (isValidData || this.loading) && this.isFocus;
+      }
+    },
+    watch: {
+      suggestionVisible(val) {
+        this.broadcast('ElAutocompleteSuggestions', 'visible', [val, this.$refs.input.$refs.input.offsetWidth]);
+      }
+    },
     methods: {
+      getData(queryString) {
+        this.loading = true;
+        this.fetchSuggestions(queryString, (suggestions) => {
+          this.loading = false;
+          if (Array.isArray(suggestions)) {
+            this.suggestions = suggestions;
+          } else {
+            console.error('autocomplete suggestions must be an array');
+          }
+        });
+      },
+      handleComposition(event) {
+        if (event.type === 'compositionend') {
+          this.isOnComposition = false;
+          this.handleChange(this.value);
+        } else {
+          this.isOnComposition = true;
+        }
+      },
       handleChange(value) {
         this.$emit('input', value);
-        this.showSuggestions(value);
+        if (this.isOnComposition || (!this.triggerOnFocus && !value)) {
+          this.suggestions = [];
+          return;
+        }
+        this.getData(value);
       },
       handleFocus() {
+        this.isFocus = true;
         if (this.triggerOnFocus) {
-          this.showSuggestions(this.value);
+          this.getData(this.value);
         }
       },
       handleBlur() {
-        this.hideSuggestions();
+        // 因为 blur 事件处理优先于 select 事件执行
+        setTimeout(_ => {
+          this.isFocus = false;
+        }, 100);
       },
-      select(index) {
-        if (this.suggestions && this.suggestions[index]) {
-          this.$emit('input', this.suggestions[index].value);
-          this.$nextTick(() => {
-            this.hideSuggestions();
-          });
+      handleKeyEnter() {
+        if (this.suggestionVisible && this.highlightedIndex >= 0 && this.highlightedIndex < this.suggestions.length) {
+          this.select(this.suggestions[this.highlightedIndex]);
         }
       },
-      hideSuggestions() {
-        this.suggestionVisible = false;
-        this.suggestions = [];
-        this.loading = false;
-      },
-      showSuggestions(value) {
-        this.suggestionVisible = true;
-        this.loading = true;
-        this.fetchSuggestions(value, (suggestions) => {
-          this.loading = false;
-          if (Array.isArray(suggestions) && suggestions.length > 0) {
-            this.suggestions = suggestions;
-          } else {
-            this.hideSuggestions();
-          }
+      select(item) {
+        this.$emit('input', item[this.props.value]);
+        this.$emit('select', item);
+        this.$nextTick(_ => {
+          this.suggestions = [];
         });
       },
       highlight(index) {
         if (!this.suggestionVisible || this.loading) { return; }
-        if (index < 0) {
-          index = 0;
-        } else if (index >= this.suggestions.length) {
+        if (index < 0) index = 0;
+        if (index >= this.suggestions.length) {
           index = this.suggestions.length - 1;
         }
+        const suggestion = this.$refs.suggestions.$el.querySelector('.el-autocomplete-suggestion__wrap');
+        const suggestionList = suggestion.querySelectorAll('.el-autocomplete-suggestion__list li');
 
-        var elSuggestions = this.$refs.suggestions;
-        var elSelect = elSuggestions.children[index];
-        var scrollTop = elSuggestions.scrollTop;
-        var offsetTop = elSelect.offsetTop;
+        let highlightItem = suggestionList[index];
+        let scrollTop = suggestion.scrollTop;
+        let offsetTop = highlightItem.offsetTop;
 
-        if (offsetTop + elSelect.scrollHeight > (scrollTop + elSuggestions.clientHeight)) {
-          elSuggestions.scrollTop += elSelect.scrollHeight;
+        if (offsetTop + highlightItem.scrollHeight > (scrollTop + suggestion.clientHeight)) {
+          suggestion.scrollTop += highlightItem.scrollHeight;
         }
         if (offsetTop < scrollTop) {
-          elSuggestions.scrollTop -= elSelect.scrollHeight;
+          suggestion.scrollTop -= highlightItem.scrollHeight;
         }
 
         this.highlightedIndex = index;
       }
+    },
+    mounted() {
+      this.$on('item-click', item => {
+        this.select(item);
+      });
+    },
+    beforeDestroy() {
+      this.$refs.suggestions.$destroy();
     }
   };
 </script>

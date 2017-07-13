@@ -6,6 +6,10 @@
     position: relative;
     vertical-align: top;
 
+    &:last-child .el-step__main {
+      padding-right: 0;
+    }
+
     @when horizontal {
       display: inline-block;
     }
@@ -25,38 +29,32 @@
       display: inline-block;
       position: absolute;
       border-color: inherit;
-      background-color: #c0ccda;
-      z-index: -1;
+      background-color: var(--color-extra-light-silver);
 
       @when icon {
         @when horizontal {
-          width: 55%;
-          margin-left: 35px;
-        }
-
-        @when vertical {
-          height: 55%;
-          margin-top: 35px;
+          right: 4px;
         }
       }
 
       @when horizontal {
         top: 15px;
         height: 2px;
-        width: 100%;
-        margin-right: -14px;
+        left: 32px;
+        right: 0;
       }
 
       @when vertical {
         width: 2px;
-        height: 100%;
         box-sizing: border-box;
-        padding-top: 28px;
+        top: 32px;
+        bottom: 0;
+        left: 15px;
       }
     }
 
     @e line-inner {
-      display: inherit;
+      display: block;
       border-width: 1px;
       border-style: solid;
       border-color: inherit;
@@ -66,7 +64,13 @@
     }
 
     @e icon {
+      display: block;
       line-height: 28px;
+
+      > * {
+        line-height: inherit;
+        vertical-align: middle;
+      }
     }
 
     @e head {
@@ -83,59 +87,59 @@
         border-style: solid;
 
         @when process {
-          color: #fff;
-          background-color: #c0ccda;
-          border-color: #c0ccda;
+          color: var(--color-white);
+          background-color: var(--color-extra-light-silver);
+          border-color: var(--color-extra-light-silver);
         }
 
         @when wait {
-          color: #c0ccda;
-          background-color: #fff;
-          border-color: #c0ccda;
+          color: var(--color-extra-light-silver);
+          background-color: var(--color-white);
+          border-color: var(--color-extra-light-silver);
         }
 
         @when success {
-          color: #fff;
-          background-color: #13ce66;
-          border-color: #13ce66;
+          color: var(--color-white);
+          background-color: var(--color-success);
+          border-color: var(--color-success);
         }
 
         @when error {
-          color: #fff;
-          background-color: #ff4949;
-          border-color: #ff4949;
+          color: var(--color-white);
+          background-color: var(--color-danger);
+          border-color: var(--color-danger);
         }
 
         @when finish {
-          color: #fff;
-          background-color: #20a0ff;
-          border-color: #20a0ff;
+          color: var(--color-white);
+          background-color: var(--color-primary);
+          border-color: var(--color-primary);
         }
       }
 
       @when process {
-        color: #c0ccda;
-        border-color: #c0ccda;
+        color: var(--color-extra-light-silver);
+        border-color: var(--color-extra-light-silver);
       }
 
       @when wait {
-        color: #c0ccda;
-        border-color: #c0ccda;
+        color: var(--color-extra-light-silver);
+        border-color: var(--color-extra-light-silver);
       }
 
       @when success {
-        color: #13ce66;
-        border-color: #13ce66;
+        color: var(--color-success);
+        border-color: var(--color-success);
       }
 
       @when error {
-        color: #ff4949;
-        border-color: #ff4949;
+        color: var(--color-danger);
+        border-color: var(--color-danger);
       }
 
       @when finish {
-        color: #20a0ff;
-        border-color: #20a0ff;
+        color: var(--color-primary);
+        border-color: var(--color-primary);
       }
     }
 
@@ -147,32 +151,32 @@
 
     @e title {
       font-size: 14px;
-      margin-top: 5px;
+      line-height: 32px;
       display: inline-block;
 
       @when process {
         font-weight: 700;
-        color: #475669;
+        color: var(--color-extra-light-black);
       }
 
       @when wait {
         font-weight: normal;
-        color: #99a9bf;
+        color: var(--color-light-silver);
       }
 
       @when success {
         font-weight: 700;
-        color: #13ce66;
+        color: var(--color-success);
       }
 
       @when error {
         font-weight: 700;
-        color: #ff4949;
+        color: var(--color-danger);
       }
 
       @when finish {
         font-weight: 700;
-        color: #20a0ff;
+        color: var(--color-primary);
       }
     }
 
@@ -182,23 +186,23 @@
       line-height: 14px;
 
       @when process {
-        color: #8492a6;
+        color: var(--color-base-silver);
       }
 
       @when wait {
-        color: #c0ccda;
+        color: var(--color-extra-light-silver);
       }
 
       @when success {
-        color: #13ce66;
+        color: var(--color-success);
       }
 
       @when error {
-        color: #ff4949;
+        color: var(--color-danger);
       }
 
       @when finish {
-        color: #20a0ff;
+        color: var(--color-primary);
       }
     }
   }

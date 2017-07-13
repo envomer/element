@@ -1,31 +1,54 @@
 <template>
-  <div class="el-message-box__wrapper">
-    <transition name="msgbox-bounce">
-      <div class="el-message-box" v-show="value">
-        <div class="el-message-box__header" v-if="title !== ''">
-          <div class="el-message-box__title">{{ title }}</div>
-          <i class="el-message-box__close el-icon-close" @click="handleAction('cancel')" v-if="showClose"></i>
+  <transition name="msgbox-fade">
+    <div class="el-message-box__wrapper" tabindex="-1" v-show="visible" @click.self="handleWrapperClick">
+      <div class="el-message-box" :class="customClass">
+        <div class="el-message-box__header" v-if="title !== undefined">
+          <div class="el-message-box__title">{{ title || t('el.messagebox.title') }}</div>
+          <button type="button" class="el-message-box__headerbtn" aria-label="Close" 
+                  v-if="showClose" @click="handleAction('cancel')">
+            <i class="el-message-box__close el-icon-close"></i>
+          </button>
         </div>
         <div class="el-message-box__content" v-if="message !== ''">
           <div class="el-message-box__status" :class="[ typeClass ]"></div>
-          <div class="el-message-box__message" :style="{ 'margin-left': typeClass ? '50px' : '0' }"><p>{{ message }}</p></div>
+          <div class="el-message-box__message" :style="{ 'margin-left': typeClass ? '50px' : '0' }">
+            <slot><p>{{ message }}</p></slot>
+          </div>
           <div class="el-message-box__input" v-show="showInput">
-            <el-input v-model="inputValue" :placeholder="inputPlaceholder" ref="input"></el-input>
+            <el-input v-model="inputValue" @keyup.enter.native="handleAction('confirm')" :placeholder="inputPlaceholder" ref="input"></el-input>
             <div class="el-message-box__errormsg" :style="{ visibility: !!editorErrorMessage ? 'visible' : 'hidden' }">{{ editorErrorMessage }}</div>
           </div>
         </div>
         <div class="el-message-box__btns">
-          <el-button :class="[ cancelButtonClasses ]" v-show="showCancelButton" @click.native="handleAction('cancel')">{{ cancelButtonText }}</el-button>
-          <el-button :class="[ confirmButtonClasses ]" v-show="showConfirmButton" @click.native="handleAction('confirm')" type="primary">{{ confirmButtonText }}</el-button>
+          <el-button
+            :loading="cancelButtonLoading"
+            :class="[ cancelButtonClasses ]"
+            v-show="showCancelButton"
+            @click.native="handleAction('cancel')">
+            {{ cancelButtonText || t('el.messagebox.cancel') }}
+          </el-button>
+          <el-button
+            :loading="confirmButtonLoading"
+            ref="confirm"
+            :class="[ confirmButtonClasses ]"
+            v-show="showConfirmButton"
+            @click.native="handleAction('confirm')">
+            {{ confirmButtonText || t('el.messagebox.confirm') }}
+          </el-button>
         </div>
       </div>
-    </transition>
-  </div>
+    </div>
+  </transition>
 </template>
 
 <script type="text/babel">
-  let CONFIRM_TEXT = '确定';
-  let CANCEL_TEXT = '取消';
+  import Popup from 'element-ui/src/utils/popup';
+  import Locale from 'element-ui/src/mixins/locale';
+  import ElInput from 'element-ui/packages/input';
+  import ElButton from 'element-ui/packages/button';
+  import { addClass, removeClass } from 'element-ui/src/utils/dom';
+  import { t } from 'element-ui/src/locale';
+
   let typeMap = {
     success: 'circle-check',
     info: 'information',
@@ -33,14 +56,14 @@
     error: 'circle-cross'
   };
 
-  import Popup from 'vue-popup';
-  import ElInput from 'packages/input/index.js';
-
   export default {
-    mixins: [ Popup ],
+    mixins: [Popup, Locale],
 
     props: {
       modal: {
+        default: true
+      },
+      lockScroll: {
         default: true
       },
       showClose: {
@@ -56,7 +79,8 @@
     },
 
     components: {
-      ElInput
+      ElInput,
+      ElButton
     },
 
     computed: {
@@ -65,27 +89,50 @@
       },
 
       confirmButtonClasses() {
-        return `el-button el-button-primary ${ this.confirmButtonClass }`;
+        return `el-button--primary ${ this.confirmButtonClass }`;
       },
       cancelButtonClasses() {
-        return `el-button el-button-default ${ this.cancelButtonClass }`;
+        return `${ this.cancelButtonClass }`;
       }
     },
 
     methods: {
+      getSafeClose() {
+        const currentId = this.uid;
+        return () => {
+          this.$nextTick(() => {
+            if (currentId === this.uid) this.doClose();
+          });
+        };
+      },
       doClose() {
-        this.value = false;
+        if (!this.visible) return;
+        this.visible = false;
         this._closing = true;
 
         this.onClose && this.onClose();
 
-        if (this.modal) {
-          document.body.style.overflow = this.bodyOverflow;
+        if (this.lockScroll) {
+          setTimeout(() => {
+            if (this.modal && this.bodyOverflow !== 'hidden') {
+              document.body.style.overflow = this.bodyOverflow;
+              document.body.style.paddingRight = this.bodyPaddingRight;
+            }
+            this.bodyOverflow = null;
+            this.bodyPaddingRight = null;
+          }, 200);
         }
         this.opened = false;
 
         if (!this.transition) {
           this.doAfterClose();
+        }
+        if (this.action) this.callback(this.action, this);
+      },
+
+      handleWrapperClick() {
+        if (this.closeOnClickModal) {
+          this.handleAction('cancel');
         }
       },
 
@@ -93,25 +140,29 @@
         if (this.$type === 'prompt' && action === 'confirm' && !this.validate()) {
           return;
         }
-        var callback = this.callback;
-        this.value = false;
-        callback(action);
+        this.action = action;
+        if (typeof this.beforeClose === 'function') {
+          this.close = this.getSafeClose();
+          this.beforeClose(action, this, this.close);
+        } else {
+          this.doClose();
+        }
       },
 
       validate() {
         if (this.$type === 'prompt') {
           var inputPattern = this.inputPattern;
           if (inputPattern && !inputPattern.test(this.inputValue || '')) {
-            this.editorErrorMessage = this.inputErrorMessage || '输入的数据不合法!';
-            this.$refs.input.$el.querySelector('input').classList.add('invalid');
+            this.editorErrorMessage = this.inputErrorMessage || t('el.messagebox.error');
+            addClass(this.$refs.input.$el.querySelector('input'), 'invalid');
             return false;
           }
           var inputValidator = this.inputValidator;
           if (typeof inputValidator === 'function') {
             var validateResult = inputValidator(this.inputValue);
             if (validateResult === false) {
-              this.editorErrorMessage = this.inputErrorMessage || '输入的数据不合法!';
-              this.$refs.input.$el.querySelector('input').classList.add('invalid');
+              this.editorErrorMessage = this.inputErrorMessage || t('el.messagebox.error');
+              addClass(this.$refs.input.$el.querySelector('input'), 'invalid');
               return false;
             }
             if (typeof validateResult === 'string') {
@@ -121,34 +172,51 @@
           }
         }
         this.editorErrorMessage = '';
-        this.$refs.input.$el.querySelector('input').classList.remove('invalid');
+        removeClass(this.$refs.input.$el.querySelector('input'), 'invalid');
         return true;
       }
     },
 
     watch: {
-      inputValue() {
-        if (this.$type === 'prompt') {
-          this.validate();
+      inputValue: {
+        immediate: true,
+        handler(val) {
+          this.$nextTick(_ => {
+            if (this.$type === 'prompt' && val !== null) {
+              this.validate();
+            }
+          });
         }
       },
 
-      value(val) {
-        if (val && this.$type === 'prompt') {
+      visible(val) {
+        if (val) this.uid++;
+        if (this.$type === 'alert' || this.$type === 'confirm') {
+          this.$nextTick(() => {
+            this.$refs.confirm.$el.focus();
+          });
+        }
+        if (this.$type !== 'prompt') return;
+        if (val) {
           setTimeout(() => {
             if (this.$refs.input && this.$refs.input.$el) {
               this.$refs.input.$el.querySelector('input').focus();
             }
           }, 500);
+        } else {
+          this.editorErrorMessage = '';
+          removeClass(this.$refs.input.$el.querySelector('input'), 'invalid');
         }
       }
     },
 
     data() {
       return {
-        title: '',
+        uid: 1,
+        title: undefined,
         message: '',
         type: '',
+        customClass: '',
         showInput: false,
         inputValue: null,
         inputPlaceholder: '',
@@ -157,12 +225,14 @@
         inputErrorMessage: '',
         showConfirmButton: true,
         showCancelButton: false,
-        confirmButtonText: CONFIRM_TEXT,
-        cancelButtonText: CANCEL_TEXT,
+        action: '',
+        confirmButtonText: '',
+        cancelButtonText: '',
+        confirmButtonLoading: false,
+        cancelButtonLoading: false,
         confirmButtonClass: '',
         confirmButtonDisabled: false,
         cancelButtonClass: '',
-
         editorErrorMessage: null,
         callback: null
       };

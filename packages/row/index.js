@@ -1,8 +1,9 @@
-const ElRow = require('./src/row');
+import Row from './src/row';
 
-ElRow.install = function(Vue) {
-  Vue.component('el-row', ElRow);
+/* istanbul ignore next */
+Row.install = function(Vue) {
+  Vue.component(Row.name, Row);
 };
 
-module.exports = ElRow;
+export default Row;
 

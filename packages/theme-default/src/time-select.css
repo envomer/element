@@ -1,21 +1,16 @@
-@import "../../date-picker/src/css/picker.css";
-@import "../../date-picker/src/css/date-picker.css";
-@import "../../date-picker/src/css/vars.css";
+@import "./date-picker/picker.css";
+@import "./date-picker/date-picker.css";
+@import "./common/var.css";
+@import "./scrollbar.css";
 
 .time-select {
-  min-width: 200px;
   margin: 5px 0;
-  width: 100%;
+  min-width: 0;
 }
 
 .time-select .el-picker-panel__content {
   max-height: 200px;
-  overflow: hidden;
   margin: 0;
-
-  &:hover {
-    overflow-y: auto;
-  }
 }
 
 .time-select-item {
@@ -25,10 +20,10 @@
 
 .time-select-item.selected:not(.disabled) {
   background-color: var(--datepicker-active-color);
-  color: #fff;
+  color: var(--color-white);
 
   &:hover {
-    background-color: #1d8ce0;
+    background-color: var(--color-primary);
   }
 }
 

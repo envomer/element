@@ -1,13 +1,23 @@
+<template>
+  <li class="el-menu-item-group">
+    <div class="el-menu-item-group__title" :style="{paddingLeft: levelPadding + 'px'}">
+      <template v-if="!$slots.title">{{title}}</template>
+      <slot v-else name="title"></slot>
+    </div>
+    <ul>
+      <slot></slot>
+    </ul>
+  </li>
+</template>
 <script>
-  module.exports = {
-    name: 'el-menu-item-group',
+  export default {
+    name: 'ElMenuItemGroup',
 
-    componentName: 'menu-item-group',
+    componentName: 'ElMenuItemGroup',
 
     props: {
       title: {
-        type: String,
-        required: true
+        type: String
       }
     },
     data() {
@@ -15,33 +25,20 @@
         paddingLeft: 20
       };
     },
-    methods: {
-      initPadding() {
-        var parent = this.$parent;
-        var level = 0;
-        var componentTag = parent.$options._componentTag;
-
-        while (componentTag !== 'el-menu') {
-          if (componentTag === 'el-submenu') {
-            level++;
+    computed: {
+      levelPadding() {
+        let padding = 10;
+        let parent = this.$parent;
+        while (parent && parent.$options.componentName !== 'ElMenu') {
+          if (parent.$options.componentName === 'ElSubmenu') {
+            padding += 20;
           }
           parent = parent.$parent;
-          componentTag = parent.$options._componentTag;
         }
-        this.paddingLeft += level * 10;
+        padding === 10 && (padding = 20);
+        return padding;
       }
-    },
-    mounted() {
-      this.initPadding();
     }
   };
 </script>
 
-<template>
-  <li class="el-menu-item-group">
-    <div class="el-menu-item-group__title" :style="{'padding-left': paddingLeft + 'px'}">{{title}}</div>
-    <ul>
-      <slot></slot>
-    </ul>
-  </li>
-</template>

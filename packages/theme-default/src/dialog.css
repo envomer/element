@@ -1,33 +1,35 @@
 @charset "UTF-8";
 @import "./common/var.css";
-@import '../../dialog/node_modules/vue-popup/lib/popup.css';
+@import "./common/popup.css";
 
 @component-namespace el {
 
   @b dialog {
-    position: relative;
-    margin-left: auto;
-    margin-right: auto;
-    background: #fff;
-    border-radius: 2px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-white);
+    border-radius: var(--border-radius-small);
+    box-shadow: var(--dialog-box-shadow);
     box-sizing: border-box;
+    margin-bottom: 50px;
 
     @modifier tiny {
-      width: 30%;
+      width: var(--dialog-tiny-width);
     }
 
     @modifier small {
-      width: 50%;
+      width: var(--dialog-small-width);
     }
 
     @modifier large {
-      width: 90%;
+      width: var(--dialog-large-width);
     }
 
     @modifier full {
       width: 100%;
       top: 0;
+      margin-bottom: 0;
       height: 100%;
       overflow: auto;
     }
@@ -42,30 +44,36 @@
       padding: 20px 20px 0;
     }
 
-    @e close {
+    @e headerbtn {
+      float: right;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0;
       cursor: pointer;
-      color: #C0CCDA;
 
-      &:hover {
-        color: var(--dialog-background-color);
+      .el-dialog__close {
+        color: var(--dialog-close-color);
+      }
+      
+      &:focus, &:hover {
+        .el-dialog__close {
+          color: var(--dialog-close-hover-color);
+        }
       }
     }
 
     @e title {
       line-height: 1;
-      font-size: 16px;
+      font-size: var(--dialog-title-font-size);
       font-weight: bold;
-      color: #1f2d3d;
+      color: var(--color-base-black);
     }
 
     @e body {
       padding: 30px 20px;
-      color: #475669;
-      font-size: 14px;
-    }
-
-    @e headerbtn {
-      float: right;
+      color: var(--color-extra-light-black);
+      font-size: var(--dialog-font-size);
     }
 
     @e footer {

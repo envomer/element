@@ -1,5 +1,5 @@
 {
-  "name": "el-table",
+  "name": "element-table",
   "version": "1.0.0",
   "description": "A table component for Vue.",
   "keywords": [
@@ -8,10 +8,10 @@
     "component"
   ],
   "main": "./lib/index.js",
-  "repository": "https://github.com/element-component/element/tree/master/packages/dialog",
+  "repository": "https://github.com/ElemeFE/element/tree/master/packages/table",
   "author": "elemefe",
   "license": "MIT",
-  "devDependencies": {
+  "dependencies": {
     "throttle-debounce": "^1.0.1"
   }
 }

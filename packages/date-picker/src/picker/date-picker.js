@@ -15,8 +15,22 @@ export default {
   name: 'ElDatePicker',
 
   props: {
-    type: String,
-    default: 'date'
+    type: {
+      type: String,
+      default: 'date'
+    }
+  },
+
+  watch: {
+    type(type) {
+      if (this.picker) {
+        this.unmountPicker();
+        this.panel = getPanel(type);
+        this.mountPicker();
+      } else {
+        this.panel = getPanel(type);
+      }
+    }
   },
 
   created() {

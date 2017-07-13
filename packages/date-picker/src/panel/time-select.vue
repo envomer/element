@@ -1,22 +1,24 @@
 <template>
-  <transition name="md-fade-bottom">
+  <transition name="el-zoom-in-top" @after-leave="$emit('dodestroy')">
     <div
       v-show="visible"
+      :style="{ width: width + 'px' }"
+      :class="popperClass"
       class="el-picker-panel time-select">
-      <div class="el-picker-panel__content">
+      <el-scrollbar noresize wrap-class="el-picker-panel__content">
         <div class="time-select-item"
           v-for="item in items"
           :class="{ selected: value === item.value, disabled: item.disabled }"
           :disabled="item.disabled"
-          @click="handleClick(item)">
-          {{ item.value }}
-        </div>
-      </div>
+          @click="handleClick(item)">{{ item.value }}</div>
+      </el-scrollbar>
     </div>
   </transition>
 </template>
 
-<script type="text/ecmascript-6">
+<script type="text/babel">
+  import ElScrollbar from 'element-ui/packages/scrollbar';
+
   const parseTime = function(time) {
     const values = ('' || time).split(':');
     if (values.length >= 2) {
@@ -28,6 +30,7 @@
         minutes
       };
     }
+    /* istanbul ignore next */
     return null;
   };
 
@@ -68,9 +71,14 @@
   };
 
   export default {
+    components: { ElScrollbar },
+
     watch: {
-      minTime(val) {
-        if (this.value && val && compareTime(this.value, val) === -1) {
+      value(val) {
+        if (!val) return;
+        if (this.minTime && compareTime(val, this.minTime) < 0) {
+          this.$emit('pick');
+        } else if (this.maxTime && compareTime(val, this.maxTime) > 0) {
           this.$emit('pick');
         }
       }
@@ -81,17 +89,24 @@
         if (!item.disabled) {
           this.$emit('pick', item.value);
         }
+      },
+
+      handleClear() {
+        this.$emit('pick');
       }
     },
 
     data() {
       return {
+        popperClass: '',
         start: '09:00',
         end: '18:00',
         step: '00:30',
         value: '',
         visible: false,
-        minTime: ''
+        minTime: '',
+        maxTime: '',
+        width: 0
       };
     },
 
@@ -108,7 +123,8 @@
           while (compareTime(current, end) <= 0) {
             result.push({
               value: current,
-              disabled: compareTime(current, this.minTime || '00:00') <= 0
+              disabled: compareTime(current, this.minTime || '-1:-1') <= 0 ||
+                compareTime(current, this.maxTime || '100:100') >= 0
             });
             current = nextTime(current, step);
           }

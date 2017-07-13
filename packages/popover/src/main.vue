@@ -1,29 +1,26 @@
 <template>
-  <transition :name="transition">
-    <div
-      class="el-popover"
-      ref="popper"
-      v-show="showPopper"
-      :style="{ width: width + 'px' }">
-      <div class="el-popover__title" v-if="title" v-text="title"></div>
-      <slot>{{ content }}</slot>
-    </div>
-  </transition>
+  <span>
+    <transition :name="transition" @after-leave="doDestroy">
+      <div
+        class="el-popover"
+        :class="[popperClass]"
+        ref="popper"
+        v-show="!disabled && showPopper"
+        :style="{ width: width + 'px' }">
+        <div class="el-popover__title" v-if="title" v-text="title"></div>
+        <slot>{{ content }}</slot>
+      </div>
+    </transition>
+    <slot name="reference"></slot>
+  </span>
 </template>
 
 <script>
-import Popper from 'main/utils/vue-popper';
-import Vue from 'vue';
-import { on, off } from 'wind-dom/src/event';
-
-Vue.directive('popover', {
-  bind(el, binding, vnode) {
-    vnode.context.$refs[binding.arg].$refs.reference = el;
-  }
-});
+import Popper from 'element-ui/src/utils/vue-popper';
+import { on, off } from 'element-ui/src/utils/dom';
 
 export default {
-  name: 'el-popover',
+  name: 'ElPopover',
 
   mixins: [Popper],
 
@@ -31,11 +28,13 @@ export default {
     trigger: {
       type: String,
       default: 'click',
-      validator: value => ['click', 'focus', 'hover'].indexOf(value) > -1
+      validator: value => ['click', 'focus', 'hover', 'manual'].indexOf(value) > -1
     },
     title: String,
+    disabled: Boolean,
     content: String,
     reference: {},
+    popperClass: String,
     width: {},
     visibleArrow: {
       default: true
@@ -43,75 +42,105 @@ export default {
     transition: {
       type: String,
       default: 'fade-in-linear'
-    },
-    options: {
-      default() {
-        return {
-          gpuAcceleration: false
-        };
-      }
+    }
+  },
+
+  watch: {
+    showPopper(newVal, oldVal) {
+      newVal ? this.$emit('show') : this.$emit('hide');
     }
   },
 
   mounted() {
-    setTimeout(() => {
-      let _timer;
-      const reference = this.reference || this.$refs.reference;
-      this.$nextTick(() => {
-        if (this.trigger === 'click') {
-          on(reference, 'click', () => { this.showPopper = !this.showPopper; });
-          on(document, 'click', (e) => {
-            if (!this.$el ||
-                !reference ||
-                this.$el.contains(e.target) ||
-                reference.contains(e.target)) return;
-            this.showPopper = false;
-          });
-        } else if (this.trigger === 'hover') {
-          on(reference, 'mouseenter', () => {
-            this.showPopper = true;
-            clearTimeout(_timer);
-          });
-          on(reference, 'mouseleave', () => {
-            _timer = setTimeout(() => {
-              this.showPopper = false;
-            }, 200);
-          });
-        } else {
-          if ([].slice.call(reference.children).length) {
-            const children = reference.childNodes;
+    let reference = this.reference || this.$refs.reference;
+    const popper = this.popper || this.$refs.popper;
 
-            for (let i = 0; i < children.length; i++) {
-              if (children[i].nodeName === 'INPUT') {
-                on(children[i], 'focus', () => { this.showPopper = true; });
-                on(children[i], 'blur', () => { this.showPopper = false; });
-                break;
-              }
-            }
-          } else if (
-              reference.nodeName === 'INPUT' ||
-              reference.nodeName === 'TEXTAREA'
-          ) {
-            on(reference, 'focus', () => { this.showPopper = true; });
-            on(reference, 'blur', () => { this.showPopper = false; });
-          } else {
-            on(reference, 'mousedown', () => { this.showPopper = true; });
-            on(reference, 'mouseup', () => { this.showPopper = false; });
+    if (!reference && this.$slots.reference && this.$slots.reference[0]) {
+      reference = this.referenceElm = this.$slots.reference[0].elm;
+    }
+    if (this.trigger === 'click') {
+      on(reference, 'click', this.doToggle);
+      on(document, 'click', this.handleDocumentClick);
+    } else if (this.trigger === 'hover') {
+      on(reference, 'mouseenter', this.handleMouseEnter);
+      on(popper, 'mouseenter', this.handleMouseEnter);
+      on(reference, 'mouseleave', this.handleMouseLeave);
+      on(popper, 'mouseleave', this.handleMouseLeave);
+    } else if (this.trigger === 'focus') {
+      let found = false;
+
+      if ([].slice.call(reference.children).length) {
+        const children = reference.childNodes;
+        const len = children.length;
+        for (let i = 0; i < len; i++) {
+          if (children[i].nodeName === 'INPUT' ||
+              children[i].nodeName === 'TEXTAREA') {
+            on(children[i], 'focus', this.doShow);
+            on(children[i], 'blur', this.doClose);
+            found = true;
+            break;
           }
         }
-      });
-    }, 100);
+      }
+      if (found) return;
+      if (reference.nodeName === 'INPUT' ||
+        reference.nodeName === 'TEXTAREA') {
+        on(reference, 'focus', this.doShow);
+        on(reference, 'blur', this.doClose);
+      } else {
+        on(reference, 'mousedown', this.doShow);
+        on(reference, 'mouseup', this.doClose);
+      }
+    }
+  },
+
+  methods: {
+    doToggle() {
+      this.showPopper = !this.showPopper;
+    },
+    doShow() {
+      this.showPopper = true;
+    },
+    doClose() {
+      this.showPopper = false;
+    },
+    handleMouseEnter() {
+      this.showPopper = true;
+      clearTimeout(this._timer);
+    },
+    handleMouseLeave() {
+      this._timer = setTimeout(() => {
+        this.showPopper = false;
+      }, 200);
+    },
+    handleDocumentClick(e) {
+      let reference = this.reference || this.$refs.reference;
+      const popper = this.popper || this.$refs.popper;
+
+      if (!reference && this.$slots.reference && this.$slots.reference[0]) {
+        reference = this.referenceElm = this.$slots.reference[0].elm;
+      }
+      if (!this.$el ||
+        !reference ||
+        this.$el.contains(e.target) ||
+        reference.contains(e.target) ||
+        !popper ||
+        popper.contains(e.target)) return;
+      this.showPopper = false;
+    }
   },
 
   destroyed() {
-    const reference = this.reference || this.$refs.reference;
+    const reference = this.reference;
 
-    off(reference, 'mouseup');
-    off(reference, 'mousedown');
-    off(reference, 'focus');
-    off(reference, 'blur');
-    off(reference, 'mouseleave');
-    off(reference, 'mouseenter');
+    off(reference, 'click', this.doToggle);
+    off(reference, 'mouseup', this.doClose);
+    off(reference, 'mousedown', this.doShow);
+    off(reference, 'focus', this.doShow);
+    off(reference, 'blur', this.doClose);
+    off(reference, 'mouseleave', this.handleMouseLeave);
+    off(reference, 'mouseenter', this.handleMouseEnter);
+    off(document, 'click', this.handleDocumentClick);
   }
 };
 </script>

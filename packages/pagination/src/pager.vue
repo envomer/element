@@ -9,8 +9,7 @@
       :class="[quickprevIconClass]"
       v-if="showPrevMore"
       @mouseenter="quickprevIconClass = 'el-icon-d-arrow-left'"
-      @mouseleave="quickprevIconClass = 'el-icon-more'"
-    >
+      @mouseleave="quickprevIconClass = 'el-icon-more'">
     </li>
     <li
       v-for="pager in pagers"
@@ -21,8 +20,7 @@
       :class="[quicknextIconClass]"
       v-if="showNextMore"
       @mouseenter="quicknextIconClass = 'el-icon-d-arrow-right'"
-      @mouseleave="quicknextIconClass = 'el-icon-more'"
-    >
+      @mouseleave="quicknextIconClass = 'el-icon-more'">
     </li>
     <li
       :class="{ active: currentPage === pageCount }"
@@ -39,6 +37,16 @@
       currentPage: Number,
 
       pageCount: Number
+    },
+
+    watch: {
+      showPrevMore(val) {
+        if (!val) this.quickprevIconClass = 'el-icon-more';
+      },
+
+      showNextMore(val) {
+        if (!val) this.quicknextIconClass = 'el-icon-more';
+      }
     },
 
     methods: {
@@ -60,6 +68,7 @@
           }
         }
 
+        /* istanbul ignore if */
         if (!isNaN(newPage)) {
           if (newPage < 1) {
             newPage = 1;
@@ -71,7 +80,7 @@
         }
 
         if (newPage !== currentPage) {
-          this.$emit('currentchange', newPage);
+          this.$emit('change', newPage);
         }
       }
     },

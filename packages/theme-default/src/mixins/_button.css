@@ -3,7 +3,8 @@
   background-color: $background-color;
   border-color: $border-color;
 
-  &:hover {
+  &:hover,
+  &:focus {
     background: tint($background-color, var(--button-hover-tint-percent));
     border-color: tint($border-color, var(--button-hover-tint-percent));
     color: $color;
@@ -27,14 +28,15 @@
     border: var(--border-base);
     color: var(--button-default-color);
 
-    &:hover {
-      background: #fff;
+    &:hover,
+    &:focus {
+      background: var(--color-white);
       border-color: $border-color;
       color: $background-color;
     }
     
     &:active {
-      background: #fff;
+      background: var(--color-white);
       border-color: shade($border-color, var(--button-active-shade-percent));
       color: shade($background-color, var(--button-active-shade-percent));
       outline: none;

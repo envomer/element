@@ -1,8 +1,9 @@
-const ElSwitch = require('./src/component');
+import Switch from './src/component';
 
-ElSwitch.install = function(Vue) {
-  Vue.component('el-switch', ElSwitch);
+/* istanbul ignore next */
+Switch.install = function(Vue) {
+  Vue.component(Switch.name, Switch);
 };
 
-module.exports = ElSwitch;
+export default Switch;
 

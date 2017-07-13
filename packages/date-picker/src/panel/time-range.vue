@@ -1,12 +1,19 @@
 <template>
-  <transition name="md-fade-bottom">
+  <transition
+    name="el-zoom-in-top"
+    @before-enter="panelCreated"
+    @after-leave="$emit('dodestroy')">
     <div
       v-show="visible"
-      class="el-time-range-picker el-picker-panel">
+      :style="{ width: width + 'px' }"
+      class="el-time-range-picker el-picker-panel"
+      :class="popperClass">
       <div class="el-time-range-picker__content">
         <div class="el-time-range-picker__cell">
-          <div class="el-time-range-picker__header">开始时间</div>
-          <div class="el-time-range-picker__body el-time-panel__content">
+          <div class="el-time-range-picker__header">{{ t('el.datepicker.startTime') }}</div>
+          <div
+            :class="{ 'has-seconds': showSeconds }"
+            class="el-time-range-picker__body el-time-panel__content">
             <time-spinner
               ref="minSpinner"
               :show-seconds="showSeconds"
@@ -19,8 +26,10 @@
           </div>
         </div>
         <div class="el-time-range-picker__cell">
-          <div class="el-time-range-picker__header">结束时间</div>
-          <div class="el-time-range-picker__body el-time-panel__content">
+          <div class="el-time-range-picker__header">{{ t('el.datepicker.endTime') }}</div>
+          <div
+            :class="{ 'has-seconds': showSeconds }"
+            class="el-time-range-picker__body el-time-panel__content">
             <time-spinner
               ref="maxSpinner"
               :show-seconds="showSeconds"
@@ -37,19 +46,21 @@
         <button
           type="button"
           class="el-time-panel__btn cancel"
-          @click="handleCancel()">取消</button>
+          @click="handleCancel()">{{ t('el.datepicker.cancel') }}</button>
         <button
           type="button"
           class="el-time-panel__btn confirm"
           @click="handleConfirm()"
-          :disabled="btnDisabled">确定</button>
+          :disabled="btnDisabled">{{ t('el.datepicker.confirm') }}</button>
       </div>
     </div>
   </transition>
 </template>
 
-<script type="text/ecmascript-6">
+<script type="text/babel">
   import { parseDate, limitRange } from '../util';
+  import Locale from 'element-ui/src/mixins/locale';
+  import TimeSpinner from '../basic/time-spinner';
 
   const MIN_TIME = parseDate('00:00:00', 'HH:mm:ss');
   const MAX_TIME = parseDate('23:59:59', 'HH:mm:ss');
@@ -59,11 +70,21 @@
 
     return minValue > maxValue;
   };
+  const clacTime = function(time) {
+    time = Array.isArray(time) ? time : [time];
+    const minTime = time[0] || new Date();
+    const date = new Date();
+    date.setHours(date.getHours() + 1);
+    const maxTime = time[1] || date;
+
+    if (minTime > maxTime) return clacTime();
+    return { minTime, maxTime };
+  };
 
   export default {
-    components: {
-      TimeSpinner: require('../basic/time-spinner')
-    },
+    mixins: [Locale],
+
+    components: { TimeSpinner },
 
     computed: {
       showSeconds() {
@@ -71,33 +92,68 @@
       }
     },
 
+    props: ['value'],
+
     data() {
-      const minTime = new Date();
-      const date = new Date();
-      date.setHours(date.getHours() + 1);
-      const maxTime = date;
+      const time = clacTime(this.$options.defaultValue);
 
       return {
-        minTime: minTime,
-        maxTime: maxTime,
-        btnDisabled: isDisabled(minTime, maxTime),
-        maxHours: maxTime.getHours(),
-        maxMinutes: maxTime.getMinutes(),
-        maxSeconds: maxTime.getSeconds(),
-        minHours: minTime.getHours(),
-        minMinutes: minTime.getMinutes(),
-        minSeconds: minTime.getSeconds(),
+        popperClass: '',
+        minTime: time.minTime,
+        maxTime: time.maxTime,
+        btnDisabled: isDisabled(time.minTime, time.maxTime),
+        maxHours: time.maxTime.getHours(),
+        maxMinutes: time.maxTime.getMinutes(),
+        maxSeconds: time.maxTime.getSeconds(),
+        minHours: time.minTime.getHours(),
+        minMinutes: time.minTime.getMinutes(),
+        minSeconds: time.minTime.getSeconds(),
         format: 'HH:mm:ss',
-        visible: false
+        visible: false,
+        width: 0
       };
     },
 
+    watch: {
+      value(newVal) {
+        this.panelCreated();
+        this.$nextTick(_ => this.ajustScrollTop());
+      }
+    },
+
     methods: {
+      panelCreated() {
+        const time = clacTime(this.value);
+        if (time.minTime === this.minTime && time.maxTime === this.maxTime) {
+          return;
+        }
+
+        this.handleMinChange({
+          hours: time.minTime.getHours(),
+          minutes: time.minTime.getMinutes(),
+          seconds: time.minTime.getSeconds()
+        });
+        this.handleMaxChange({
+          hours: time.maxTime.getHours(),
+          minutes: time.maxTime.getMinutes(),
+          seconds: time.maxTime.getSeconds()
+        });
+      },
+
+      handleClear() {
+        this.handleCancel();
+      },
+
       handleCancel() {
         this.$emit('pick');
       },
 
       handleChange() {
+        if (this.minTime > this.maxTime) return;
+        MIN_TIME.setFullYear(this.minTime.getFullYear());
+        MIN_TIME.setMonth(this.minTime.getMonth(), this.minTime.getDate());
+        MAX_TIME.setFullYear(this.maxTime.getFullYear());
+        MAX_TIME.setMonth(this.maxTime.getMonth(), this.maxTime.getDate());
         this.$refs.minSpinner.selectableRange = [[MIN_TIME, this.maxTime]];
         this.$refs.maxSpinner.selectableRange = [[this.minTime, MAX_TIME]];
         this.handleConfirm(true);
@@ -151,20 +207,17 @@
         this.minTime = limitRange(this.minTime, minSelectableRange);
         this.maxTime = limitRange(this.maxTime, maxSelectableRange);
 
+        if (first) return;
         this.$emit('pick', [this.minTime, this.maxTime], visible, first);
       },
 
       ajustScrollTop() {
         this.$refs.minSpinner.ajustScrollTop();
         this.$refs.maxSpinner.ajustScrollTop();
-      },
-
-      focusEditor(val) {
-        return this.$refs.minSpinner.focusEditor(val);
       }
     },
 
-    ready() {
+    mounted() {
       this.$nextTick(() => this.handleConfirm(true, true));
     }
   };

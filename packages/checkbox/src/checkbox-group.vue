@@ -1,19 +1,25 @@
 <script>
-  import emitter from 'main/mixins/emitter';
+  import Emitter from 'element-ui/src/mixins/emitter';
 
   export default {
     name: 'ElCheckboxGroup',
 
-    mixins: [emitter],
+    componentName: 'ElCheckboxGroup',
+
+    mixins: [Emitter],
 
     props: {
-      value: {}
+      value: {},
+      min: Number,
+      max: Number,
+      size: String,
+      fill: String,
+      textColor: String
     },
 
     watch: {
       value(value) {
-        this.$emit('change', value);
-        this.dispatch('form-item', 'el.form.change', [value]);
+        this.dispatch('ElFormItem', 'el.form.change', [value]);
       }
     }
   };

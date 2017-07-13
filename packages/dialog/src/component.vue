@@ -1,12 +1,19 @@
 <template>
   <transition name="dialog-fade">
-    <div class="el-dialog__wrapper" v-show="value" @click.self="handleWrapperClick">
-      <div class="el-dialog" :class="[sizeClass, customClass]" ref="dialog" :style="{ 'margin-bottom': size !== 'full' ? '50px' : '', 'top': size !== 'full' ? dynamicTop + 'px' : '0' }">
+    <div class="el-dialog__wrapper" v-show="visible" @click.self="handleWrapperClick">
+      <div
+        class="el-dialog"
+        :class="[sizeClass, customClass]"
+        ref="dialog"
+        :style="style">
         <div class="el-dialog__header">
-          <span class="el-dialog__title">{{title}}</span>
-          <div class="el-dialog__headerbtn">
-            <i class="el-dialog__close el-icon el-icon-close" @click='close()'></i>
-          </div>
+          <slot name="title">
+            <span class="el-dialog__title">{{title}}</span>
+          </slot>
+          <button type="button" class="el-dialog__headerbtn" aria-label="Close" 
+                  v-if="showClose" @click="handleClose">
+            <i class="el-dialog__close el-icon el-icon-close"></i>
+          </button>
         </div>
         <div class="el-dialog__body" v-if="rendered"><slot></slot></div>
         <div class="el-dialog__footer" v-if="$slots.footer">
@@ -18,12 +25,13 @@
 </template>
 
 <script>
-  import Popup from 'vue-popup';
+  import Popup from 'element-ui/src/utils/popup';
+  import emitter from 'element-ui/src/mixins/emitter';
 
   export default {
-    name: 'el-dialog',
+    name: 'ElDialog',
 
-    mixins: [ Popup ],
+    mixins: [Popup, emitter],
 
     props: {
       title: {
@@ -32,6 +40,16 @@
       },
 
       modal: {
+        type: Boolean,
+        default: true
+      },
+  
+      modalAppendToBody: {
+        type: Boolean,
+        default: true
+      },
+
+      lockScroll: {
         type: Boolean,
         default: true
       },
@@ -46,6 +64,11 @@
         default: true
       },
 
+      showClose: {
+        type: Boolean,
+        default: true
+      },
+
       size: {
         type: String,
         default: 'small'
@@ -54,23 +77,26 @@
       customClass: {
         type: String,
         default: ''
-      }
-    },
+      },
 
-    data() {
-      return {
-        dynamicTop: 0
-      };
+      top: {
+        type: String,
+        default: '15%'
+      },
+      beforeClose: Function
     },
 
     watch: {
-      value(val) {
+      visible(val) {
+        this.$emit('update:visible', val);
         if (val) {
           this.$emit('open');
+          this.$el.addEventListener('scroll', this.updatePopper);
           this.$nextTick(() => {
             this.$refs.dialog.scrollTop = 0;
           });
         } else {
+          this.$el.removeEventListener('scroll', this.updatePopper);
           this.$emit('close');
         }
       }
@@ -79,32 +105,41 @@
     computed: {
       sizeClass() {
         return `el-dialog--${ this.size }`;
+      },
+      style() {
+        return this.size === 'full' ? {} : { 'top': this.top };
       }
     },
 
     methods: {
       handleWrapperClick() {
-        if (this.closeOnClickModal) {
-          this.$emit('input', false);
+        if (!this.closeOnClickModal) return;
+        this.handleClose();
+      },
+      handleClose() {
+        if (typeof this.beforeClose === 'function') {
+          this.beforeClose(this.hide);
+        } else {
+          this.hide();
         }
       },
-
-      resetTop() {
-        this.dynamicTop = Math.floor((window.innerHeight || document.documentElement.clientHeight) * 0.16);
+      hide(cancel) {
+        if (cancel !== false) {
+          this.$emit('update:visible', false);
+          this.$emit('visible-change', false);
+        }
+      },
+      updatePopper() {
+        this.broadcast('ElSelectDropdown', 'updatePopper');
+        this.broadcast('ElDropdownMenu', 'updatePopper');
       }
     },
 
     mounted() {
-      if (this.value) {
+      if (this.visible) {
         this.rendered = true;
         this.open();
       }
-      window.addEventListener('resize', this.resetTop);
-      this.resetTop();
-    },
-
-    beforeDestroy() {
-      window.removeEventListener('resize', this.resetTop);
     }
   };
 </script>

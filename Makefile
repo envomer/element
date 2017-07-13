@@ -1,40 +1,45 @@
-.PHONY: dist
+.PHONY: dist test
 default: help
 
 # build all theme
-build-theme: build-theme-default
-
-build-theme-default:
+build-theme:
 	npm run build:theme
 
 install:
-	npm i --registry=http://registry.npm.taobao.org --ignore-scripts --loglevel=error
+	npm install
+
+install-cn:
+	npm install --registry=http://registry.npm.taobao.org
 
 dev:
 	npm run dev
 
-new:
-	node bin/new.js $(filter-out $@,$(MAKECMDGOALS))
+play:
+	npm run dev:play
 
-dist:
+new:
+	node build/bin/new.js $(filter-out $@,$(MAKECMDGOALS))
+
+new-lang:
+	node build/bin/new-lang.js $(filter-out $@,$(MAKECMDGOALS))
+
+dist: install
 	npm run dist
 
 dist-all:
 	npm run dist:all
 
-deploy: install
+deploy:
 	@npm run deploy
-	@rm -rf fe.element/element-ui
-	@cp -r examples/element-ui fe.element
-
-gh-docs:
-	@npm run gh-docs
 
 pub:
-	./node_modules/.bin/kp $(filter-out $@,$(MAKECMDGOALS))
+	npm run pub
 
 pub-all:
 	npm run pub:all
+
+test:
+	npm run test:watch
 
 help:
 	@echo "   \033[35mmake\033[0m \033[1m命令使用说明\033[0m"
@@ -46,3 +51,4 @@ help:
 	@echo "   \033[35mmake deploy\033[0m\t\033[0m\t\033[0m\t\033[0m\t---  部署 demo"
 	@echo "   \033[35mmake pub\033[0m\t\033[0m\t\033[0m\t\033[0m\t---  发布到 npm 上"
 	@echo "   \033[35mmake pub-all\033[0m\t\033[0m\t\033[0m\t\033[0m\t---  发布各组件到 npm 上"
+	@echo "   \033[35mmake new-lang <lang>\033[0m\t\033[0m\t\033[0m\t---  为网站添加新语言. 例如 'make new-lang fr'"

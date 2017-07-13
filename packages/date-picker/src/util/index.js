@@ -1,4 +1,4 @@
-import dateUtil from 'main/utils/date';
+import dateUtil from 'element-ui/src/utils/date';
 
 const newArray = function(start, end) {
   let result = [];
@@ -8,24 +8,23 @@ const newArray = function(start, end) {
   return result;
 };
 
-export const merge = function(target) {
-  for (var i = 1, j = arguments.length; i < j; i++) {
-    var source = arguments[i];
-    for (var prop in source) {
-      if (source.hasOwnProperty(prop)) {
-        var value = source[prop];
-        if (value !== undefined) {
-          target[prop] = value;
-        }
-      }
-    }
-  }
+export const equalDate = function(dateA, dateB) {
+  return dateA === dateB || new Date(dateA).getTime() === new Date(dateB).getTime();
+};
 
-  return target;
+export const toDate = function(date) {
+  return isDate(date) ? new Date(date) : null;
+};
+
+export const isDate = function(date) {
+  if (date === null || date === undefined) return false;
+  if (isNaN(new Date(date).getTime())) return false;
+  return true;
 };
 
 export const formatDate = function(date, format) {
-  if (!(date instanceof Date)) return '';
+  date = toDate(date);
+  if (!date) return '';
   return dateUtil.format(date, format || 'yyyy-MM-dd');
 };
 
@@ -142,11 +141,10 @@ export const getRangeHours = function(ranges) {
   return hours;
 };
 
-export const limitRange = function(date, ranges) {
+export const limitRange = function(date, ranges, format = 'yyyy-MM-dd HH:mm:ss') {
   if (!ranges || !ranges.length) return date;
 
   const len = ranges.length;
-  const format = 'HH:mm:ss';
 
   date = dateUtil.parse(dateUtil.format(date, format), format);
   for (let i = 0; i < len; i++) {
@@ -165,19 +163,4 @@ export const limitRange = function(date, ranges) {
   });
 
   return date < minDate ? minDate : maxDate;
-};
-
-import i18n from './i18n';
-
-export const $t = function(path) {
-  const array = path.split('.');
-  let current = i18n;
-  for (var i = 0, j = array.length; i < j; i++) {
-    var property = array[i];
-    var value = current[property];
-    if (i === j - 1) return value;
-    if (!value) return '';
-    current = value;
-  }
-  return '';
 };

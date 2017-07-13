@@ -1,7 +1,8 @@
-const ElSpinner = require('./src/spinner');
+import Spinner from './src/spinner';
 
-ElSpinner.install = function(Vue) {
-  Vue.component(ElSpinner.name, ElSpinner);
+/* istanbul ignore next */
+Spinner.install = function(Vue) {
+  Vue.component(Spinner.name, Spinner);
 };
 
-module.exports = ElSpinner;
+export default Spinner;

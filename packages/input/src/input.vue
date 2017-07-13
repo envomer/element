@@ -1,10 +1,12 @@
 <template>
   <div :class="[
     type === 'textarea' ? 'el-textarea' : 'el-input',
-    size ? 'el-input-' + size : '',
+    size ? 'el-input--' + size : '',
     {
       'is-disabled': disabled,
-      'el-input-group': $slots.prepend || $slots.append
+      'el-input-group': $slots.prepend || $slots.append,
+      'el-input-group--append': $slots.append,
+      'el-input-group--prepend': $slots.prepend
     }
   ]">
     <template v-if="type !== 'textarea'">
@@ -12,124 +14,172 @@
       <div class="el-input-group__prepend" v-if="$slots.prepend">
         <slot name="prepend"></slot>
       </div>
-      <input
-        :type="type"
-        :name="name"
-        class="el-input__inner"
-        :placeholder="placeholder"
-        v-model="currentValue"
-        :disabled="disabled"
-        :readonly="readonly"
-        @focus="$emit('onfocus', currentValue)"
-        @blur="handleBlur"
-        :number="number"
-        :maxlength="maxlength"
-        :minlength="minlength"
-        :autocomplete="autoComplete"
-        ref="input"
-      >
       <!-- input 图标 -->
-      <i class="el-input__icon" :class="[icon ? 'el-icon-' + icon : '']" v-if="icon"></i>
+      <slot name="icon">
+        <i class="el-input__icon"
+          :class="[
+            'el-icon-' + icon,
+            onIconClick ? 'is-clickable' : ''
+          ]"
+          v-if="icon"
+          @click="handleIconClick">
+        </i>
+      </slot>
+      <input
+        v-if="type !== 'textarea'"
+        class="el-input__inner"
+        v-bind="$props"
+        :autocomplete="autoComplete"
+        :value="currentValue"
+        ref="input"
+        @input="handleInput"
+        @focus="handleFocus"
+        @blur="handleBlur"
+      >
       <i class="el-input__icon el-icon-loading" v-if="validating"></i>
       <!-- 后置元素 -->
       <div class="el-input-group__append" v-if="$slots.append">
         <slot name="append"></slot>
       </div>
     </template>
-    <!-- 写成垂直的方式会导致 placeholder 失效, 蜜汁bug -->
-    <textarea v-else v-model="currentValue" class="el-textarea__inner" :name="name" :placeholder="placeholder" :disabled="disabled" :readonly="readonly" @focus="$emit('onfocus', currentValue)" @blur="handleBlur"></textarea>
+    <textarea
+      v-else
+      class="el-textarea__inner"
+      :value="currentValue"
+      @input="handleInput"
+      ref="textarea"
+      v-bind="$props"
+      :style="textareaStyle"
+      @focus="handleFocus"
+      @blur="handleBlur">
+    </textarea>
   </div>
 </template>
 <script>
-  import emitter from 'main/mixins/emitter';
+  import emitter from 'element-ui/src/mixins/emitter';
+  import calcTextareaHeight from './calcTextareaHeight';
+  import merge from 'element-ui/src/utils/merge';
 
   export default {
     name: 'ElInput',
 
+    componentName: 'ElInput',
+
     mixins: [emitter],
+
+    data() {
+      return {
+        currentValue: this.value,
+        textareaCalcStyle: {}
+      };
+    },
 
     props: {
       value: [String, Number],
-      placeholder: {
-        type: String,
-        default: ''
-      },
-      size: {
-        type: String,
-        default: ''
-      },
-      readonly: {
-        type: Boolean,
-        default: false
-      },
-      icon: {
-        type: String,
-        default: ''
-      },
-      disabled: {
-        type: Boolean,
-        default: false
-      },
+      placeholder: String,
+      size: String,
+      resize: String,
+      readonly: Boolean,
+      autofocus: Boolean,
+      icon: String,
+      disabled: Boolean,
       type: {
         type: String,
         default: 'text'
       },
-      name: {
-        type: String,
-        default: ''
-      },
-      number: {
-        type: Boolean,
+      name: String,
+      autosize: {
+        type: [Boolean, Object],
         default: false
+      },
+      rows: {
+        type: Number,
+        default: 2
       },
       autoComplete: {
         type: String,
         default: 'off'
       },
+      form: String,
       maxlength: Number,
-      minlength: Number
+      minlength: Number,
+      max: {},
+      min: {},
+      step: {},
+      validateEvent: {
+        type: Boolean,
+        default: true
+      },
+      onIconClick: Function
+    },
+
+    computed: {
+      validating() {
+        return this.$parent.validateState === 'validating';
+      },
+      textareaStyle() {
+        return merge({}, this.textareaCalcStyle, { resize: this.resize });
+      }
+    },
+
+    watch: {
+      'value'(val, oldValue) {
+        this.setCurrentValue(val);
+      }
     },
 
     methods: {
       handleBlur(event) {
-        this.$emit('onblur', this.currentValue);
-        this.dispatch('form-item', 'el.form.blur', [this.currentValue]);
+        this.$emit('blur', event);
+        if (this.validateEvent) {
+          this.dispatch('ElFormItem', 'el.form.blur', [this.currentValue]);
+        }
       },
-
       inputSelect() {
         this.$refs.input.select();
-      }
-    },
+      },
+      resizeTextarea() {
+        if (this.$isServer) return;
+        var { autosize, type } = this;
+        if (!autosize || type !== 'textarea') return;
+        const minRows = autosize.minRows;
+        const maxRows = autosize.maxRows;
 
-    data() {
-      return {
-        currentValue: ''
-      };
+        this.textareaCalcStyle = calcTextareaHeight(this.$refs.textarea, minRows, maxRows);
+      },
+      handleFocus(event) {
+        this.$emit('focus', event);
+      },
+      handleInput(event) {
+        const value = event.target.value;
+        this.$emit('input', value);
+        this.setCurrentValue(value);
+        this.$emit('change', value);
+      },
+      handleIconClick(event) {
+        if (this.onIconClick) {
+          this.onIconClick(event);
+        }
+        this.$emit('click', event);
+      },
+      setCurrentValue(value) {
+        if (value === this.currentValue) return;
+        this.$nextTick(_ => {
+          this.resizeTextarea();
+        });
+        this.currentValue = value;
+        if (this.validateEvent) {
+          this.dispatch('ElFormItem', 'el.form.change', [value]);
+        }
+      }
     },
 
     created() {
       this.$on('inputSelect', this.inputSelect);
     },
 
-    computed: {
-      validating() {
-        return this.$parent.validating;
-      }
-    },
-
-    watch: {
-      'value': {
-        immediate: true,
-        handler(val) {
-          this.currentValue = val;
-        }
-      },
-
-      'currentValue'(val) {
-        this.$emit('input', val);
-        this.$emit('onchange', val);
-        this.dispatch('form-item', 'el.form.change', [val]);
-      }
+    mounted() {
+      this.resizeTextarea();
     }
   };
 </script>

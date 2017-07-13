@@ -1,47 +1,82 @@
 <template>
   <div class="el-input-number"
     :class="[
-      size ? 'is-' + size : '',
-      { 'is-disabled': disabled }
+      size ? 'el-input-number--' + size : '',
+      { 'is-disabled': disabled },
+      { 'is-without-controls': !controls}
     ]"
   >
-    <el-input
-      v-model="currentValue"
-      :disabled="disabled"
-      :size="size"
-      :number="true"
-      :class="{
-        'is-active': inputActive
-      }">
-    </el-input>
     <span
-      class="el-input-number__decrease el-icon-minus"
+      v-if="controls"
+      class="el-input-number__decrease"
       :class="{'is-disabled': minDisabled}"
       v-repeat-click="decrease"
-      @mouseenter="activeInput(minDisabled)"
-      @mouseleave="inactiveInput(minDisabled)"
     >
+      <i class="el-icon-minus"></i>
     </span>
     <span
-      class="el-input-number__increase el-icon-plus"
+      v-if="controls"
+      class="el-input-number__increase"
       :class="{'is-disabled': maxDisabled}"
       v-repeat-click="increase"
-      @mouseenter="activeInput(maxDisabled)"
-      @mouseleave="inactiveInput(maxDisabled)"
     >
+      <i class="el-icon-plus"></i>
     </span>
+    <el-input
+      :value="currentValue"
+      @keydown.up.native.prevent="increase"
+      @keydown.down.native.prevent="decrease"
+      @blur="handleBlur"
+      @input="debounceHandleInput"
+      :disabled="disabled"
+      :size="size"
+      :max="max"
+      :min="min"
+      ref="input"
+    >
+        <template slot="prepend" v-if="$slots.prepend">
+          <slot name="prepend"></slot>
+        </template>
+        <template slot="append" v-if="$slots.append">
+          <slot name="append"></slot>
+        </template> 
+    </el-input>
   </div>
 </template>
 <script>
-  import ElInput from 'packages/input/index.js';
-  import { once, on } from 'wind-dom/src/event';
+  import ElInput from 'element-ui/packages/input';
+  import { once, on } from 'element-ui/src/utils/dom';
+  import debounce from 'throttle-debounce/debounce';
 
   export default {
     name: 'ElInputNumber',
+    directives: {
+      repeatClick: {
+        bind(el, binding, vnode) {
+          let interval = null;
+          let startTime;
+          const handler = () => vnode.context[binding.expression].apply();
+          const clear = () => {
+            if (new Date() - startTime < 100) {
+              handler();
+            }
+            clearInterval(interval);
+            interval = null;
+          };
+
+          on(el, 'mousedown', () => {
+            startTime = new Date();
+            once(document, 'mouseup', clear);
+            clearInterval(interval);
+            interval = setInterval(handler, 100);
+          });
+        }
+      }
+    },
+    components: {
+      ElInput
+    },
     props: {
-      value: {
-        default: 1
-      },
       step: {
         type: Number,
         default: 1
@@ -52,138 +87,125 @@
       },
       min: {
         type: Number,
+        default: -Infinity
+      },
+      value: {
         default: 0
       },
       disabled: Boolean,
-      size: String
-    },
-    directives: {
-      repeatClick: {
-        bind(el, binding, vnode) {
-          let interval = null;
-          let startTime;
-
-          const handler = () => {
-            vnode.context[binding.expression]();
-          };
-
-          const clear = function() {
-            if (new Date() - startTime < 100) {
-              handler();
-            }
-            clearInterval(interval);
-            interval = null;
-          };
-
-          on(el, 'mousedown', function() {
-            startTime = new Date();
-            once(document, 'mouseup', clear);
-            interval = setInterval(function() {
-              handler();
-            }, 100);
-          });
-        }
+      size: String,
+      controls: {
+        type: Boolean,
+        default: true
+      },
+      debounce: {
+        type: Number,
+        default: 300
       }
-    },
-    components: {
-      ElInput
     },
     data() {
       return {
-        currentValue: this.value,
-        inputActive: false
+        currentValue: 0
       };
     },
     watch: {
-      currentValue(newVal, oldVal) {
-        if (!isNaN(newVal) && newVal <= this.max && newVal >= this.min) {
-          this.$emit('change', newVal);
+      value: {
+        immediate: true,
+        handler(value) {
+          let newVal = Number(value);
+          if (isNaN(newVal)) return;
+          if (newVal >= this.max) newVal = this.max;
+          if (newVal <= this.min) newVal = this.min;
+          this.currentValue = newVal;
           this.$emit('input', newVal);
-        } else {
-          this.$nextTick(() => {
-            this.currentValue = oldVal;
-          });
         }
       }
     },
     computed: {
       minDisabled() {
-        return this.currentValue - this.step < this.min;
+        return this._decrease(this.value, this.step) < this.min;
       },
       maxDisabled() {
-        return this.currentValue + this.step > this.max;
+        return this._increase(this.value, this.step) > this.max;
+      },
+      precision() {
+        const { value, step, getPrecision } = this;
+        return Math.max(getPrecision(value), getPrecision(step));
       }
     },
     methods: {
-      accSub(arg1, arg2) {
-        var r1, r2, m, n;
-        try {
-          r1 = arg1.toString().split('.')[1].length;
-        } catch (e) {
-          r1 = 0;
-        }
-        try {
-          r2 = arg2.toString().split('.')[1].length;
-        } catch (e) {
-          r2 = 0;
-        }
-        m = Math.pow(10, Math.max(r1, r2));
-        n = (r1 >= r2) ? r1 : r2;
-        return parseFloat(((arg1 * m - arg2 * m) / m).toFixed(n));
+      toPrecision(num, precision) {
+        if (precision === undefined) precision = this.precision;
+        return parseFloat(parseFloat(Number(num).toFixed(precision)));
       },
-      accAdd(arg1, arg2) {
-        var r1, r2, m, c;
-        try {
-          r1 = arg1.toString().split('.')[1].length;
-        } catch (e) {
-          r1 = 0;
+      getPrecision(value) {
+        const valueString = value.toString();
+        const dotPosition = valueString.indexOf('.');
+        let precision = 0;
+        if (dotPosition !== -1) {
+          precision = valueString.length - dotPosition - 1;
         }
-        try {
-          r2 = arg2.toString().split('.')[1].length;
-        } catch (e) {
-          r2 = 0;
-        }
-        c = Math.abs(r1 - r2);
-        m = Math.pow(10, Math.max(r1, r2));
-        if (c > 0) {
-          var cm = Math.pow(10, c);
-          if (r1 > r2) {
-            arg1 = Number(arg1.toString().replace('.', ''));
-            arg2 = Number(arg2.toString().replace('.', '')) * cm;
-          } else {
-            arg1 = Number(arg1.toString().replace('.', '')) * cm;
-            arg2 = Number(arg2.toString().replace('.', ''));
-          }
-        } else {
-          arg1 = Number(arg1.toString().replace('.', ''));
-          arg2 = Number(arg2.toString().replace('.', ''));
-        }
-        return (arg1 + arg2) / m;
+        return precision;
+      },
+      _increase(val, step) {
+        if (typeof val !== 'number') return this.currentValue;
+
+        const precisionFactor = Math.pow(10, this.precision);
+
+        return this.toPrecision((precisionFactor * val + precisionFactor * step) / precisionFactor);
+      },
+      _decrease(val, step) {
+        if (typeof val !== 'number') return this.currentValue;
+
+        const precisionFactor = Math.pow(10, this.precision);
+
+        return this.toPrecision((precisionFactor * val - precisionFactor * step) / precisionFactor);
       },
       increase() {
-        if (this.currentValue + this.step > this.max || this.disabled) return;
-        this.currentValue = this.accAdd(this.step, this.currentValue);
-        if (this.maxDisabled) {
-          this.inputActive = false;
-        }
+        if (this.disabled || this.maxDisabled) return;
+        const value = this.value || 0;
+        const newVal = this._increase(value, this.step);
+        if (newVal > this.max) return;
+        this.setCurrentValue(newVal);
       },
       decrease() {
-        if (this.currentValue - this.step < this.min || this.disabled) return;
-        this.currentValue = this.accSub(this.currentValue, this.step);
-        if (this.minDisabled) {
-          this.inputActive = false;
-        }
+        if (this.disabled || this.minDisabled) return;
+        const value = this.value || 0;
+        const newVal = this._decrease(value, this.step);
+        if (newVal < this.min) return;
+        this.setCurrentValue(newVal);
       },
-      activeInput(disabled) {
-        if (!this.disabled && !disabled) {
-          this.inputActive = true;
-        }
+      handleBlur() {
+        this.$refs.input.setCurrentValue(this.currentValue);
       },
-      inactiveInput(disabled) {
-        if (!this.disabled && !disabled) {
-          this.inputActive = false;
+      setCurrentValue(newVal) {
+        const oldVal = this.currentValue;
+        if (newVal >= this.max) newVal = this.max;
+        if (newVal <= this.min) newVal = this.min;
+        if (oldVal === newVal) {
+          this.$refs.input.setCurrentValue(this.currentValue);
+          return;
+        }
+        this.$emit('change', newVal, oldVal);
+        this.$emit('input', newVal);
+        this.currentValue = newVal;
+      },
+      handleInput(value) {
+        if (value === '') {
+          return;
+        }
+        const newVal = Number(value);
+        if (!isNaN(newVal)) {
+          this.setCurrentValue(newVal);
+        } else {
+          this.$refs.input.setCurrentValue(this.currentValue);
         }
       }
+    },
+    created() {
+      this.debounceHandleInput = debounce(this.debounce, value => {
+        this.handleInput(value);
+      });
     }
   };
 </script>

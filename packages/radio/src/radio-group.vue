@@ -1,28 +1,31 @@
-<script>
-  import emitter from 'main/mixins/emitter';
-
-  export default {
-    name: 'ElRadioGroup',
-
-    componentName: 'radio-group',
-
-    mixins: [emitter],
-
-    props: {
-      value: [String, Number],
-      size: String
-    },
-    watch: {
-      value(value) {
-        this.$emit('change', value);
-        this.dispatch('form-item', 'el.form.change', [this.value]);
-      }
-    }
-  };
-</script>
-
 <template>
   <div class="el-radio-group">
     <slot></slot>
   </div>
 </template>
+<script>
+  import Emitter from 'element-ui/src/mixins/emitter';
+
+  export default {
+    name: 'ElRadioGroup',
+
+    componentName: 'ElRadioGroup',
+
+    mixins: [Emitter],
+
+    props: {
+      value: {},
+      size: String,
+      fill: String,
+      textColor: String,
+      disabled: Boolean
+    },
+    watch: {
+      value(value) {
+        this.$emit('change', value);
+        this.dispatch('ElFormItem', 'el.form.change', [this.value]);
+      }
+    }
+  };
+</script>
+

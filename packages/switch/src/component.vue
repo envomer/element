@@ -1,15 +1,22 @@
 <template>
-  <div class="el-switch" :class="{ 'is-disabled': disabled, 'el-switch--wide': hasText }">
+  <label class="el-switch" :class="{ 'is-disabled': disabled, 'el-switch--wide': hasText, 'is-checked': checked }">
     <div class="el-switch__mask" v-show="disabled"></div>
-    <input class="el-switch__input" type="checkbox" v-model="value" :name="name" :disabled="disabled" style="display: none;">
-    <span class="el-switch__core" ref="core" @click="handleMiscClick" :style="{ 'width': coreWidth + 'px' }">
-      <span class="el-switch__button" ref="button"></span>
+    <input
+      class="el-switch__input"
+      type="checkbox"
+      @change="handleChange"
+      ref="input"
+      :name="name"
+      :true-value="onValue"
+      :false-value="offValue"
+      :disabled="disabled">
+    <span class="el-switch__core" ref="core" :style="{ 'width': coreWidth + 'px' }">
+      <span class="el-switch__button" :style="{ transform }"></span>
     </span>
     <transition name="label-fade">
       <div
         class="el-switch__label el-switch__label--left"
-        v-show="value"
-        @click="handleMiscClick"
+        v-show="checked"
         :style="{ 'width': coreWidth + 'px' }">
         <i :class="[onIconClass]" v-if="onIconClass"></i>
         <span v-if="!onIconClass && onText">{{ onText }}</span>
@@ -18,22 +25,21 @@
     <transition name="label-fade">
       <div
         class="el-switch__label el-switch__label--right"
-        v-show="!value"
-        @click="handleMiscClick"
+        v-show="!checked"
         :style="{ 'width': coreWidth + 'px' }">
         <i :class="[offIconClass]" v-if="offIconClass"></i>
         <span v-if="!offIconClass && offText">{{ offText }}</span>
       </div>
     </transition>
-  </div>
+  </label>
 </template>
 
 <script>
   export default {
-    name: 'el-switch',
+    name: 'ElSwitch',
     props: {
       value: {
-        type: Boolean,
+        type: [Boolean, String, Number],
         default: true
       },
       disabled: {
@@ -68,6 +74,14 @@
         type: String,
         default: ''
       },
+      onValue: {
+        type: [Boolean, String, Number],
+        default: true
+      },
+      offValue: {
+        type: [Boolean, String, Number],
+        default: false
+      },
       name: {
         type: String,
         default: ''
@@ -75,45 +89,58 @@
     },
     data() {
       return {
-        coreWidth: 0
+        coreWidth: this.width
       };
     },
+    created() {
+      if (!~[this.onValue, this.offValue].indexOf(this.value)) {
+        this.$emit('input', this.offValue);
+      }
+    },
     computed: {
+      checked() {
+        return this.value === this.onValue;
+      },
       hasText() {
+        /* istanbul ignore next */
         return this.onText || this.offText;
+      },
+      transform() {
+        return this.checked ? `translate(${ this.coreWidth - 20 }px, 2px)` : 'translate(2px, 2px)';
       }
     },
     watch: {
-      value() {
+      checked() {
         if (this.onColor || this.offColor) {
-          this.handleCoreColor();
+          this.setBackgroundColor();
         }
-        this.handleButtonTransform();
-        this.$emit('change');
       }
     },
     methods: {
-      handleMiscClick() {
-        if (!this.disabled) {
-          this.$emit('input', !this.value);
-        }
+      handleChange(event) {
+        this.$emit('change', !this.checked ? this.onValue : this.offValue);
+        this.$emit('input', !this.checked ? this.onValue : this.offValue);
+        this.$nextTick(() => {
+          // set input's checked property
+          // in case parent refuses to change component's value
+          this.$refs.input.checked = this.checked;
+        });
       },
-      handleButtonTransform() {
-        this.$refs.button.style.transform = this.value ? `translate3d(${ this.coreWidth - 20 }px, 2px, 0)` : 'translate3d(2px, 2px, 0)';
-      },
-      handleCoreColor() {
-        this.$refs.core.style.borderColor = this.value ? this.onColor : this.offColor;
-        this.$refs.core.style.backgroundColor = this.value ? this.onColor : this.offColor;
+      setBackgroundColor() {
+        let newColor = this.checked ? this.onColor : this.offColor;
+        this.$refs.core.style.borderColor = newColor;
+        this.$refs.core.style.backgroundColor = newColor;
       }
     },
     mounted() {
+      /* istanbul ignore if */
       if (this.width === 0) {
         this.coreWidth = this.hasText ? 58 : 46;
       }
-      this.handleButtonTransform();
-      if ((this.onColor || this.offColor) && !this.disabled) {
-        this.handleCoreColor();
+      if (this.onColor || this.offColor) {
+        this.setBackgroundColor();
       }
+      this.$refs.input.checked = this.checked;
     }
   };
 </script>

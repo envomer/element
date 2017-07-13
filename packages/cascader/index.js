@@ -1,7 +1,8 @@
-const ElCascader = require('./src/cascader');
+import Cascader from './src/main';
 
-ElCascader.install = function(Vue) {
-  Vue.component(ElCascader.name, ElCascader);
+/* istanbul ignore next */
+Cascader.install = function(Vue) {
+  Vue.component(Cascader.name, Cascader);
 };
 
-module.exports = ElCascader;
+export default Cascader;

@@ -4,66 +4,77 @@
 @component-namespace el {
 
   @b message {
-    box-shadow:0 2px 4px 0 rgba(0, 0, 0, .12), 0 0 6px 0 rgba(0, 0, 0, .04);
-    min-width: 300px;
-    padding: 10px 12px;
+    box-shadow: var(--message-shadow);
+    min-width: var(--message-min-width);
+    padding: var(--message-padding);
     box-sizing: border-box;
-    border-radius: 2px;
+    border-radius: var(--border-radius-small);
     position: fixed;
     left: 50%;
     top: 20px;
     transform: translateX(-50%);
-    background-color: #fff;
+    background-color: var(--color-white);
     transition: opacity 0.3s, transform .4s;
     overflow: hidden;
-    z-index: var(--index-popper);
 
     @e group {
       margin-left: 38px;
       position: relative;
+      height: 20px;
+      line-height: 20px;
+      display: flex;
+      align-items: center;
+
+      @when with-icon {
+        margin-left: 0;
+      }
 
       & p {
-        font-size: 14px;
-        line-height: 20px;
+        font-size: var(--font-size-base);
         margin: 0 34px 0 0;
         white-space: nowrap;
-        color: #8492a6;
+        color: var(--message-content-color);
         text-align: justify;
       }
     }
 
-    @e icon {
+    @e img {
       size: 40px;
       position: absolute;
       left: 0;
       top: 0;
     }
 
+    @e icon {
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
     @e closeBtn {
       position: absolute 3px 0 * *;
       cursor: pointer;
-      color: #C0CCDA;
-      font-size: 14px;
+      color: var(--message-close-color);
+      font-size: var(--font-size-base);
 
       &:hover {
-        color: #99A9BF;
+        color: var(--message-close-hover-color);
       }
     }
 
     & .el-icon-circle-check {
-      color: #13ce66;
+      color: var(--message-success-color);
     }
 
     & .el-icon-circle-cross {
-      color: #ff4949;
+      color: var(--message-danger-color);
     }
 
     & .el-icon-information {
-      color: #50bfff;
+      color: var(--message-info-color);
     }
 
     & .el-icon-warning {
-      color: #f7ba2a;
+      color: var(--message-warning-color);
     }
   }
 

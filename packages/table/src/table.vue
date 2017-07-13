@@ -1,39 +1,162 @@
 <template>
-  <div class="el-table" :class="{ 'el-table--fit': fit, 'el-table--striped': stripe, 'el-table--border': border }" @mouseleave="handleMouseLeave($event)">
+  <div class="el-table"
+    :class="{
+      'el-table--fit': fit,
+      'el-table--striped': stripe,
+      'el-table--border': border,
+      'el-table--fluid-height': maxHeight,
+      'el-table--enable-row-hover': !store.states.isComplex,
+      'el-table--enable-row-transition': (store.states.data || []).length !== 0 && (store.states.data || []).length < 100
+    }"
+    @mouseleave="handleMouseLeave($event)">
     <div class="hidden-columns" ref="hiddenColumns"><slot></slot></div>
-    <div class="el-table__header-wrapper">
-      <table-header :columns="columns" :all-selected="allSelected" @allselectedchange="handleAllSelectedChange" :selection="selection" :style="{ width: bodyWidth ? bodyWidth + 'px' : '' }" :border="border"></table-header>
+    <div class="el-table__header-wrapper" ref="headerWrapper" v-if="showHeader">
+      <table-header
+        :store="store"
+        :layout="layout"
+        :border="border"
+        :default-sort="defaultSort"
+        :style="{ width: layout.bodyWidth ? layout.bodyWidth + 'px' : '' }">
+      </table-header>
     </div>
-    <div class="el-table__body-wrapper">
-      <table-body :columns="columns" :selection="selection" :data="filterData" :style="{ width: bodyWidth ? bodyWidth - (showVScrollBar ? currentGutterWidth : 0 ) + 'px' : '' }"></table-body>
-    </div>
-    <div class="el-table__fixed" :style="{ width: fixedBodyWidth ? fixedBodyWidth + 'px' : '' }" ref="fixed">
-      <div class="el-table__fixed-header-wrapper" v-if="fixedColumnCount > 0">
-        <table-header :columns="fixedColumns" :all-selected="allSelected" @allselectedchange="handleAllSelectedChange" :selection="selection" :style="{ width: fixedBodyWidth ? fixedBodyWidth + 'px' : '' }" :border="border"></table-header>
+    <div
+      class="el-table__body-wrapper"
+      ref="bodyWrapper"
+      :style="[bodyHeight]">
+      <table-body
+        :context="context"
+        :store="store"
+        :stripe="stripe"
+        :layout="layout"
+        :row-class-name="rowClassName"
+        :row-style="rowStyle"
+        :highlight="highlightCurrentRow"
+        :style="{ width: bodyWidth }">
+      </table-body>
+      <div :style="{ width: bodyWidth }" class="el-table__empty-block" v-if="!data || data.length === 0">
+        <span class="el-table__empty-text"><slot name="empty">{{ emptyText || t('el.table.emptyText') }}</slot></span>
       </div>
-      <div class="el-table__fixed-body-wrapper" v-if="fixedColumnCount > 0" :style="{ top: headerHeight + 'px' }">
-        <table-body :columns="fixedColumns" fixed :selection="selection" :data="filterData" :style="{ width: fixedBodyWidth ? fixedBodyWidth + 'px' : '' }"></table-body>
+    </div>
+    <div class="el-table__footer-wrapper" ref="footerWrapper" v-if="showSummary" v-show="data && data.length > 0">
+      <table-footer
+        :store="store"
+        :layout="layout"
+        :border="border"
+        :sum-text="sumText || t('el.table.sumText')"
+        :summary-method="summaryMethod"
+        :default-sort="defaultSort"
+        :style="{ width: layout.bodyWidth ? layout.bodyWidth + 'px' : '' }">
+      </table-footer>
+    </div>
+    <div class="el-table__fixed" ref="fixedWrapper"
+      v-if="fixedColumns.length > 0"
+      :style="[
+        { width: layout.fixedWidth ? layout.fixedWidth + 'px' : '' },
+        fixedHeight
+      ]">
+      <div class="el-table__fixed-header-wrapper" ref="fixedHeaderWrapper" v-if="showHeader">
+        <table-header
+          fixed="left"
+          :border="border"
+          :store="store"
+          :layout="layout"
+          :style="{ width: layout.fixedWidth ? layout.fixedWidth + 'px' : '' }"></table-header>
+      </div>
+      <div class="el-table__fixed-body-wrapper" ref="fixedBodyWrapper"
+        :style="[
+          { top: layout.headerHeight + 'px' },
+          fixedBodyHeight
+        ]">
+        <table-body
+          fixed="left"
+          :store="store"
+          :stripe="stripe"
+          :layout="layout"
+          :highlight="highlightCurrentRow"
+          :row-class-name="rowClassName"
+          :row-style="rowStyle"
+          :style="{ width: layout.fixedWidth ? layout.fixedWidth + 'px' : '' }">
+        </table-body>
+      </div>
+      <div class="el-table__fixed-footer-wrapper" ref="fixedFooterWrapper" v-if="showSummary" v-show="data && data.length > 0">
+        <table-footer
+          fixed="left"
+          :border="border"
+          :sum-text="sumText || t('el.table.sumText')"
+          :summary-method="summaryMethod"
+          :store="store"
+          :layout="layout"
+          :style="{ width: layout.fixedWidth ? layout.fixedWidth + 'px' : '' }"></table-footer>
       </div>
     </div>
+    <div class="el-table__fixed-right" ref="rightFixedWrapper"
+      v-if="rightFixedColumns.length > 0"
+      :style="[
+        { width: layout.rightFixedWidth ? layout.rightFixedWidth + 'px' : '' },
+        { right: layout.scrollY ? (border ? layout.gutterWidth : (layout.gutterWidth || 1)) + 'px' : '' },
+        fixedHeight
+      ]">
+      <div class="el-table__fixed-header-wrapper" ref="rightFixedHeaderWrapper" v-if="showHeader">
+        <table-header
+          fixed="right"
+          :border="border"
+          :store="store"
+          :layout="layout"
+          :style="{ width: layout.rightFixedWidth ? layout.rightFixedWidth + 'px' : '' }"></table-header>
+      </div>
+      <div class="el-table__fixed-body-wrapper" ref="rightFixedBodyWrapper"
+        :style="[
+          { top: layout.headerHeight + 'px' },
+          fixedBodyHeight
+        ]">
+        <table-body
+          fixed="right"
+          :store="store"
+          :stripe="stripe"
+          :layout="layout"
+          :row-class-name="rowClassName"
+          :row-style="rowStyle"
+          :highlight="highlightCurrentRow"
+          :style="{ width: layout.rightFixedWidth ? layout.rightFixedWidth + 'px' : '' }">
+        </table-body>
+      </div>
+      <div class="el-table__fixed-footer-wrapper" ref="rightFixedFooterWrapper" v-if="showSummary" v-show="data && data.length > 0">
+        <table-footer
+          fixed="right"
+          :border="border"
+          :sum-text="sumText || t('el.table.sumText')"
+          :summary-method="summaryMethod"
+          :store="store"
+          :layout="layout"
+          :style="{ width: layout.rightFixedWidth ? layout.rightFixedWidth + 'px' : '' }"></table-footer>
+      </div>
+    </div>
+    <div class="el-table__fixed-right-patch"
+      v-if="rightFixedColumns.length > 0"
+      :style="{ width: layout.scrollY ? layout.gutterWidth + 'px' : '0', height: layout.headerHeight + 'px' }"></div>
     <div class="el-table__column-resize-proxy" ref="resizeProxy" v-show="resizeProxyVisible"></div>
-    <slot name="bottom"></slot>
   </div>
 </template>
 
 <script type="text/babel">
+  import ElCheckbox from 'element-ui/packages/checkbox';
   import throttle from 'throttle-debounce/throttle';
   import debounce from 'throttle-debounce/debounce';
-  import { getScrollBarWidth, orderBy } from './util';
-  import objectAssign from 'object-assign';
-
-  let gridIdSeed = 1;
-  let GUTTER_WIDTH;
-
+  import { addResizeListener, removeResizeListener } from 'element-ui/src/utils/resize-event';
+  import Locale from 'element-ui/src/mixins/locale';
+  import TableStore from './table-store';
+  import TableLayout from './table-layout';
   import TableBody from './table-body';
   import TableHeader from './table-header';
+  import TableFooter from './table-footer';
+  import { mousewheel } from './util';
+
+  let tableIdSeed = 1;
 
   export default {
-    name: 'el-table',
+    name: 'ElTable',
+
+    mixins: [Locale],
 
     props: {
       data: {
@@ -43,421 +166,293 @@
         }
       },
 
-      width: String,
+      width: [String, Number],
 
-      height: String,
+      height: [String, Number],
+
+      maxHeight: [String, Number],
 
       fit: {
         type: Boolean,
         default: true
       },
 
-      stripe: {
+      stripe: Boolean,
+
+      border: Boolean,
+
+      rowKey: [String, Function],
+
+      context: {},
+
+      showHeader: {
         type: Boolean,
-        default: false
+        default: true
       },
 
-      border: {
-        type: Boolean,
-        default: false
-      },
+      showSummary: Boolean,
 
-      fixedColumnCount: {
-        type: Number,
-        default: 0
-      },
+      sumText: String,
 
-      selectionMode: {
-        type: String,
-        default: 'none'
-      },
+      summaryMethod: Function,
 
-      selection: {},
+      rowClassName: [String, Function],
 
-      allowNoSelection: {
-        type: Boolean,
-        default: false
-      },
+      rowStyle: [Object, Function],
 
-      gutterWidth: {
-        default: 0
-      },
+      highlightCurrentRow: Boolean,
 
-      customCriteria: Array,
-      customBackgroundColors: Array
+      currentRowKey: [String, Number],
+
+      emptyText: String,
+
+      expandRowKeys: Array,
+
+      defaultExpandAll: Boolean,
+
+      defaultSort: Object,
+
+      tooltipEffect: String
     },
 
     components: {
       TableHeader,
-      TableBody
+      TableFooter,
+      TableBody,
+      ElCheckbox
     },
 
     methods: {
-      handleAllSelectedChange(val) {
-        this.allSelected = val;
+      setCurrentRow(row) {
+        this.store.commit('setCurrentRow', row);
       },
 
-      doOnDataChange(data) {
-        data = data || [];
-
-        if (this.selectionMode === 'single') {
-          const oldSelection = this.selected;
-          if (oldSelection === null) {
-            if (!this.allowNoSelection) {
-              this.selected = data[0];
-              if (this.selected !== oldSelection) {
-                this.$emit('selectionchange', this.selected);
-              }
-            }
-          } else if (data.indexOf(oldSelection) === -1) {
-            if (!this.allowNoSelection) {
-              this.selected = data[0];
-            } else {
-              this.selected = null;
-            }
-            if (this.selected !== oldSelection) {
-              this.$emit('selectionchange', this.selected);
-            }
-          }
-        }
+      toggleRowSelection(row, selected) {
+        this.store.toggleRowSelection(row, selected);
+        this.store.updateAllSelected();
       },
 
-      toggleAllSelection() {
-        setTimeout(() => {
-          this.tableData.forEach(item => {
-            item.$selected = this.allSelected;
-          });
-        }, 0);
-      },
-
-      $calcColumns() {
-        let fit = this.fit;
-        let columns = this.columns;
-
-        let bodyWidth = this.$el.clientWidth;
-        let bodyMinWidth = 0;
-
-        let flattenColumns = [];
-
-        columns.forEach((column) => {
-          if (column.isColumnGroup) {
-            flattenColumns.push.apply(flattenColumns, column.columns);
-          } else {
-            flattenColumns.push(column);
-          }
-        });
-
-        if (fit) {
-          let flexColumns = [];
-          let definedWidthColumnsWidth = 0;
-          let definedMinWidthSum = 0;
-
-          flattenColumns.forEach((column) => {
-            definedMinWidthSum += column.minWidth || 80;
-            bodyMinWidth += column.width || column.minWidth || 80;
-
-            if (typeof column.width === 'number') {
-              definedWidthColumnsWidth += column.width;
-            } else {
-              flexColumns.push(column);
-            }
-          });
-
-          if (bodyMinWidth < bodyWidth - this.currentGutterWidth) { // do not have scroll bar.
-            let flexWidthTotal = bodyWidth - this.currentGutterWidth - columns.length - bodyMinWidth;
-            let flexWidthPerColumn = Math.floor(flexWidthTotal / flexColumns.length);
-            let flexWidthFirstColumn = flexWidthTotal - flexWidthPerColumn * flexColumns.length + flexWidthPerColumn;
-
-            flexColumns.forEach((column, index) => {
-              if (index === 0) {
-                column.realWidth = (column.minWidth || 80) + flexWidthFirstColumn;
-              } else {
-                column.realWidth = (column.minWidth || 80) + flexWidthPerColumn;
-              }
-            });
-          } else { // need horizontal scroll bar.
-            this.showHScrollBar = true;
-            flexColumns.forEach(function(column) {
-              column.realWidth = column.minWidth;
-            });
-          }
-
-          this.bodyWidth = Math.max(bodyMinWidth, bodyWidth);
-        } else {
-          flattenColumns.forEach((column) => {
-            if (!column.width && !column.minWidth) {
-              column.realWidth = 80;
-            }
-
-            bodyMinWidth += column.realWidth;
-          });
-          this.showHScrollBar = bodyMinWidth > bodyWidth;
-
-          this.bodyWidth = bodyMinWidth;
-        }
-
-        if (this.styleNode) {
-          let styleSheet = this.styleNode.sheet;
-
-          if (!styleSheet) return;
-          for (let i = 0, j = styleSheet.cssRules.length; i < j; i++) {
-            styleSheet.deleteRule(0);
-          }
-
-          columns.forEach(function(column) {
-            const addRule = function(rule) {
-              styleSheet.insertRule(rule, styleSheet.cssRules.length);
-            };
-
-            if (column.isColumnGroup) {
-              let childColumns = column.columns;
-              let groupWidth = 0;
-              childColumns.forEach(function(childColumn) {
-                groupWidth += childColumn.realWidth;
-                addRule(`.${childColumn.id}, .${childColumn.id} > div { width: ${childColumn.realWidth}px; }`);
-              });
-
-              addRule(`.${column.id}, .${column.id} > div { width: ${groupWidth}px; }`);
-            } else {
-              addRule(`.${column.id}, .${column.id} > div { width: ${column.realWidth}px; }`);
-            }
-          });
-        }
-
-        if (this.fixedColumnCount > 0) {
-          let fixedBodyWidth = 0;
-          let fixedColumnCount = this.fixedColumnCount;
-
-          columns.forEach(function(column, index) {
-            if (index < fixedColumnCount) {
-              fixedBodyWidth += column.realWidth;
-            }
-          });
-
-          this.fixedBodyWidth = fixedBodyWidth;
-        }
-
-        this.$nextTick(() => {
-          this.headerHeight = this.$el.querySelector('.el-table__header-wrapper').offsetHeight;
-        });
-      },
-
-      $calcHeight(height) {
-        if (typeof height === 'string' && /^\d+$/.test(height)) {
-          height = Number(height);
-        }
-
-        if (!isNaN(height) && this.$el) {
-          const headerHeight = this.headerHeight = this.$el.querySelector('.el-table__header-wrapper').offsetHeight;
-          const bodyHeight = (height - headerHeight);
-          const gridWrapper = this.$el.querySelector('.el-table__body-wrapper');
-          gridWrapper.style.height = bodyHeight + 'px';
-
-          this.$el.style.height = height + 'px';
-          if (this.$refs.fixed) {
-            this.$refs.fixed.style.height = height + 'px';
-          }
-          const fixedBodyWrapper = this.$el.querySelector('.el-table__fixed-body-wrapper');
-          if (fixedBodyWrapper) {
-            fixedBodyWrapper.style.height = (this.showHScrollBar ? gridWrapper.offsetHeight - this.currentGutterWidth : gridWrapper.offsetHeight) + 'px';
-          }
-        }
+      clearSelection() {
+        this.store.clearSelection();
       },
 
       handleMouseLeave() {
-        this.hoverRowIndex = null;
-        const hoverState = this.hoverState;
-        if (hoverState) {
-          this.hoverState = null;
-        }
+        this.store.commit('setHoverRow', null);
+        if (this.hoverState) this.hoverState = null;
       },
 
-      updateScrollInfo() {
-        this.$nextTick(() => {
-          if (this.$el) {
-            let gridBodyWrapper = this.$el.querySelector('.el-table__body-wrapper');
-            let gridBody = this.$el.querySelector('.el-table__body-wrapper .el-table__body');
+      updateScrollY() {
+        this.layout.updateScrollY();
+      },
 
-            this.showVScrollBar = gridBody.offsetHeight > gridBodyWrapper.offsetHeight;
-          }
+      bindEvents() {
+        const { headerWrapper, footerWrapper } = this.$refs;
+        const refs = this.$refs;
+        this.bodyWrapper.addEventListener('scroll', function() {
+          if (headerWrapper) headerWrapper.scrollLeft = this.scrollLeft;
+          if (footerWrapper) footerWrapper.scrollLeft = this.scrollLeft;
+          if (refs.fixedBodyWrapper) refs.fixedBodyWrapper.scrollTop = this.scrollTop;
+          if (refs.rightFixedBodyWrapper) refs.rightFixedBodyWrapper.scrollTop = this.scrollTop;
         });
+
+        const scrollBodyWrapper = event => {
+          const deltaX = event.deltaX;
+
+          if (deltaX > 0) {
+            this.bodyWrapper.scrollLeft += 10;
+          } else {
+            this.bodyWrapper.scrollLeft -= 10;
+          }
+        };
+        if (headerWrapper) {
+          mousewheel(headerWrapper, throttle(16, scrollBodyWrapper));
+        }
+        if (footerWrapper) {
+          mousewheel(footerWrapper, throttle(16, scrollBodyWrapper));
+        }
+
+        if (this.fit) {
+          this.windowResizeListener = throttle(50, () => {
+            if (this.$ready) this.doLayout();
+          });
+          addResizeListener(this.$el, this.windowResizeListener);
+        }
       },
 
-      doRender() {
-        let bodyWrapper = this.$el.querySelector('.el-table__body-wrapper');
-        let headerWrapper = this.$el.querySelector('.el-table__header-wrapper');
-        const el = this.$el;
-
-        if (!this.$ready) {
-          bodyWrapper.addEventListener('scroll', function() {
-            headerWrapper.scrollLeft = this.scrollLeft;
-            let fixedBodyWrapper = el.querySelector('.el-table__fixed-body-wrapper');
-            if (fixedBodyWrapper) {
-              fixedBodyWrapper.scrollTop = this.scrollTop;
-            }
-          });
-        }
-
-        this.$calcColumns();
-
-        if (!this.$ready && this.fit) {
-          this.windowResizeListener = throttle(100, () => {
-            this.$calcColumns();
-          });
-          window.addEventListener('resize', this.windowResizeListener);
-        }
-
+      doLayout() {
+        this.store.updateColumns();
+        this.layout.update();
+        this.updateScrollY();
         this.$nextTick(() => {
           if (this.height) {
-            this.$calcHeight(this.height);
+            this.layout.setHeight(this.height);
+          } else if (this.maxHeight) {
+            this.layout.setMaxHeight(this.maxHeight);
+          } else if (this.shouldUpdateHeight) {
+            this.layout.updateHeight();
           }
         });
       }
     },
 
     created() {
-      this.gridId = 'grid_' + gridIdSeed + '_';
-
-      if (GUTTER_WIDTH === undefined) {
-        GUTTER_WIDTH = getScrollBarWidth();
-      }
-      this.currentGutterWidth = GUTTER_WIDTH;
-
-      this.debouncedReRender = debounce(50, () => {
-        this.doRender();
-      });
+      this.tableId = 'el-table_' + tableIdSeed + '_';
+      this.debouncedLayout = debounce(50, () => this.doLayout());
     },
 
     computed: {
+      bodyWrapper() {
+        return this.$refs.bodyWrapper;
+      },
+
+      shouldUpdateHeight() {
+        return typeof this.height === 'number' ||
+          this.fixedColumns.length > 0 ||
+          this.rightFixedColumns.length > 0;
+      },
+
       selection() {
-        if (this.selectionMode === 'multiple') {
-          const data = this.tableData || [];
-          return data.filter(item => item.$selected === true);
-        } else if (this.selectionMode === 'single') {
-          return this.selected;
-        } else {
-          return null;
-        }
+        return this.store.selection;
+      },
+
+      columns() {
+        return this.store.states.columns;
+      },
+
+      tableData() {
+        return this.store.states.data;
       },
 
       fixedColumns() {
-        const columns = this.columns || [];
-        const fixedColumnCount = this.fixedColumnCount;
-        return columns.filter(function(item, index) {
-          return index < fixedColumnCount;
-        });
+        return this.store.states.fixedColumns;
       },
 
-      filterData() {
-        return orderBy(this.tableData, this.sortingProperty, this.sortingDirection);
+      rightFixedColumns() {
+        return this.store.states.rightFixedColumns;
+      },
+
+      bodyHeight() {
+        let style = {};
+
+        if (this.height) {
+          style = {
+            height: this.layout.bodyHeight ? this.layout.bodyHeight + 'px' : ''
+          };
+        } else if (this.maxHeight) {
+          style = {
+            'max-height': (this.showHeader
+              ? this.maxHeight - this.layout.headerHeight - this.layout.footerHeight
+              : this.maxHeight - this.layout.footerHeight) + 'px'
+          };
+        }
+
+        return style;
+      },
+
+      bodyWidth() {
+        const { bodyWidth, scrollY, gutterWidth } = this.layout;
+        return bodyWidth ? bodyWidth - (scrollY ? gutterWidth : 0) + 'px' : '';
+      },
+
+      fixedBodyHeight() {
+        let style = {};
+
+        if (this.height) {
+          style = {
+            height: this.layout.fixedBodyHeight ? this.layout.fixedBodyHeight + 'px' : ''
+          };
+        } else if (this.maxHeight) {
+          let maxHeight = this.layout.scrollX ? this.maxHeight - this.layout.gutterWidth : this.maxHeight;
+
+          if (this.showHeader) {
+            maxHeight -= this.layout.headerHeight;
+          }
+
+          style = {
+            'max-height': maxHeight + 'px'
+          };
+        }
+
+        return style;
+      },
+
+      fixedHeight() {
+        let style = {};
+
+        if (this.maxHeight) {
+          style = {
+            bottom: (this.layout.scrollX && this.data.length) ? this.layout.gutterWidth + 'px' : ''
+          };
+        } else {
+          style = {
+            height: this.layout.viewportHeight ? this.layout.viewportHeight + 'px' : ''
+          };
+        }
+
+        return style;
       }
     },
 
     watch: {
-      fixedColumnCount() {
-        this.debouncedReRender();
-      },
-
-      selection(val) {
-        this.$emit('selectionchange', val);
-        if (this.selectionMode === 'multiple') {
-          this.allSelected = this.tableData.length > 0 && val.length === this.tableData.length;
-        }
-      },
-
-      visibleFilter(val) {
-        this.$broadcast('toggleFilterPopup', val);
-      },
-
       height(value) {
-        this.$calcHeight(value);
+        this.layout.setHeight(value);
+      },
+
+      currentRowKey(newVal) {
+        this.store.setCurrentRowKey(newVal);
       },
 
       data: {
         immediate: true,
         handler(val) {
-          if (val && this.selectionMode === 'multiple') {
-            this.tableData = val.map(item => objectAssign({ '$selected': false }, item));
-          } else {
-            this.tableData = val;
-          }
+          this.store.commit('setData', val);
+          if (this.$ready) this.doLayout();
         }
       },
 
-      tableData(newVal) {
-        this.doOnDataChange(newVal);
-        this.updateScrollInfo();
+      expandRowKeys(newVal) {
+        this.store.setExpandRowKeys(newVal);
       }
     },
 
     destroyed() {
-      if (this.styleNode) {
-        this.styleNode.parentNode.removeChild(this.styleNode);
-      }
-
-      if (this.windowResizeListener) {
-        window.removeEventListener('resize', this.windowResizeListener);
-      }
+      if (this.windowResizeListener) removeResizeListener(this.$el, this.windowResizeListener);
     },
 
     mounted() {
-      const styleNode = document.createElement('style');
-      styleNode.type = 'text/css';
-      styleNode.rel = 'stylesheet';
-      styleNode.title = 'Grid Column Style';
-      document.getElementsByTagName('head')[0].appendChild(styleNode);
+      this.bindEvents();
+      this.doLayout();
 
-      this.styleNode = styleNode;
-
-      this.doRender();
+      // init filters
+      this.store.states.columns.forEach(column => {
+        if (column.filteredValue && column.filteredValue.length) {
+          this.store.commit('filterChange', {
+            column,
+            values: column.filteredValue,
+            silent: true
+          });
+        }
+      });
 
       this.$ready = true;
-      if (this.tableData) {
-        this.doOnDataChange(this.tableData);
-      }
-      this.updateScrollInfo();
-      if (this.fixedColumnCount > 0) {
-        this.$nextTick(() => {
-          const style = this.$refs.fixed.style;
-          if (!style) return;
-          style.height = this.$el.clientHeight + 'px';
-
-          // 若非固定列中的某行内容被撑高, 需要固定列中对应行高度与其保持一致
-          let bodyHeight = this.$el.querySelector('.el-table__body-wrapper').offsetHeight;
-          let fixedBodyHeight = this.$el.querySelector('.el-table__fixed-body-wrapper').offsetHeight;
-          if (bodyHeight !== fixedBodyHeight) {
-            let bodyTrs = this.$el.querySelector('.el-table__body-wrapper').querySelectorAll('tr');
-            let fixedBodyTrs = this.$el.querySelector('.el-table__fixed-body-wrapper').querySelectorAll('tr');
-            bodyTrs.forEach((tr, index) => {
-              let trHeight = tr.offsetHeight;
-              let fixedTrHeight = fixedBodyTrs[index].offsetHeight;
-              if (trHeight !== fixedTrHeight) {
-                fixedBodyTrs[index].style.height = trHeight + 'px';
-              }
-            });
-          }
-        });
-      }
     },
 
     data() {
+      const store = new TableStore(this, {
+        rowKey: this.rowKey,
+        defaultExpandAll: this.defaultExpandAll
+      });
+      const layout = new TableLayout({
+        store,
+        table: this,
+        fit: this.fit,
+        showHeader: this.showHeader
+      });
       return {
-        tableData: this.data,
-        showHScrollBar: false,
-        showVScrollBar: false,
-        hoverRowIndex: null,
-        headerHeight: 35,
-        selected: null,
-        allSelected: false,
-        columns: [],
-        resizeProxyVisible: false,
-        bodyWidth: '',
-        fixedBodyWidth: '',
-        sortingColumn: null,
-        sortingProperty: null,
-        sortingDirection: 1,
-        visibleFilter: null,
-        currentGutterWidth: this.gutterWidth
+        store,
+        layout,
+        renderExpanded: null,
+        resizeProxyVisible: false
       };
     }
   };

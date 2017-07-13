@@ -4,18 +4,18 @@
   }
   .header {
     height: 80px;
-    background-color: #20a0ff;
+    background-color: rgba(32, 160, 255, 1);
     color: #fff;
     top: 0;
     left: 0;
     width: 100%;
-    z-index: 1000;
     line-height: @height;
     z-index: 100;
     position: relative;
 
     .container {
       height: 100%;
+      box-sizing: border-box;
     }
 
     h1 {
@@ -35,7 +35,7 @@
         display: inline-block;
         width: 34px;
         height: 18px;
-        border: 1px solid #fff;
+        border: 1px solid rgba(255, 255, 255, .5);
         text-align: center;
         line-height: 18px;
         vertical-align: middle;
@@ -52,20 +52,58 @@
       padding: 0;
       margin: 0;
     }
+    .nav-logo,
+    .nav-logo-small {
+      vertical-align: sub;
+    }
+    .nav-logo-small {
+      display: none;
+    }
     .nav-item {
       margin: 0;
       float: left;
       list-style: none;
       position: relative;
       cursor: pointer;
+      margin-left: 20px;
+    
+      &:last-child {
+        cursor: default;
+        margin-left: 34px;
+        span {
+          opacity: .8;
+        }
+
+        .nav-lang {
+          cursor: pointer;
+          display: inline-block;
+          height: 100%;
+          &:hover {
+            opacity: 1;
+          }
+          &.active {
+            font-weight: 700;
+            opacity: 1;
+          }
+        }
+      }
 
       a {
         text-decoration: none;
         color: #fff;
         display: block;
         padding: 0 20px;
+        opacity: .8;
+        &.active,
+        &:hover {
+          opacity: 1;
+        }
+         
+        &.active {
+          font-weight: 700;
+        }
 
-        &.active:before {
+        &.active::before {
           content: '';
           display: block;
           position: absolute;
@@ -77,50 +115,100 @@
         }
       }
     }
-    /*.el-menu-item__bar {
-      background-color: #99d2fc;
-    }*/
   }
-  .header-fixed {
+  .header-home {
     position: fixed;
-    top: -80px;
-    box-shadow: 0px 2px 8px 0px rgba(50,63,87,0.45);
-  }
-  .header-hangUp {
     top: 0;
+    background-color: rgba(32, 160, 255, 0);
+  }
+
+  @media (max-width: 850px) {
+    .header {
+      .nav-logo {
+        display: none;
+      }
+      .nav-logo-small {
+        display: inline-block;
+      }
+      .nav-item {
+        margin-left: 6px;
+
+        &:last-child {
+          margin-left: 10px;
+        }
+         
+        a {
+          padding: 0 5px;
+        }
+      }
+    }
+  }
+  @media (max-width: 700px) {
+    .header {
+      .container {
+        padding: 0 12px;
+      }
+      .nav-item a,
+      .nav-lang {
+        font-size: 12px;
+        vertical-align: top;
+      }
+    }
   }
 </style>
 <template>
   <div class="headerWrapper">
     <header class="header"
+    ref="header"
     :style="headerStyle"
     :class="{
-      'header-fixed': isFixed,
-      'header-hangUp': hangUp
+      'header-home': isHome
     }">
       <div class="container">
-        <h1><router-link to="/">Element<span>Beta</span></router-link></h1>
+        <h1><router-link :to="`/${ lang }`">
+          <img
+            src="../assets/images/element-logo.svg"
+            alt="element-logo"
+            class="nav-logo">
+          <img
+            src="../assets/images/element-logo-small.svg"
+            alt="element-logo"
+            class="nav-logo-small">
+        </router-link></h1>
         <ul class="nav">
           <li class="nav-item">
             <router-link
               active-class="active"
-              to="/guide/design"
-              exact>指南
+              :to="`/${ lang }/guide`">{{ langConfig.guide }}
             </router-link>
           </li>
           <li class="nav-item">
             <router-link
               active-class="active"
-              to="/component/layout"
-              exact>组件
+              :to="`/${ lang }/component`">{{ langConfig.components }}
             </router-link>
           </li>
           <li class="nav-item">
             <router-link
               active-class="active"
-              to="/resource"
-              exact>资源
+              :to="`/${ lang }/resource`"
+              exact>{{ langConfig.resource }}
             </router-link>
+          </li>
+          <li class="nav-item">
+            <span
+              class="nav-lang"
+              :class="{ 'active': lang === 'zh-CN' }"
+              @click="switchLang('zh-CN')">
+              中文
+            </span>
+            <span> / </span>
+            <span
+              class="nav-lang"
+              :class="{ 'active': lang === 'en-US' }"
+              @click="switchLang('en-US')">
+              En
+            </span>
           </li>
         </ul>
       </div>
@@ -128,46 +216,52 @@
   </div>
 </template>
 <script>
+  import compoLang from '../i18n/component.json';
+
   export default {
     data() {
       return {
         active: '',
-        isFixed: false,
-        headerStyle: {},
-        hangUp: false
+        isHome: false,
+        headerStyle: {}
       };
     },
     watch: {
+      '$route.path': {
+        immediate: true,
+        handler() {
+          this.isHome = /^home/.test(this.$route.name);
+          this.headerStyle.backgroundColor = `rgba(32, 160, 255, ${ this.isHome ? '0' : '1' })`;
+        }
+      }
+    },
+    computed: {
+      lang() {
+        return this.$route.path.split('/')[1] || 'zh-CN';
+      },
+      langConfig() {
+        return compoLang.filter(config => config.lang === this.lang)[0]['header'];
+      }
+    },
+    methods: {
+      switchLang(targetLang) {
+        if (this.lang === targetLang) return;
+        localStorage.setItem('ELEMENT_LANGUAGE', targetLang);
+        this.$router.push(this.$route.path.replace(this.lang, targetLang));
+      }
     },
     mounted() {
       function scroll(fn) {
-        var beforeScrollTop = document.body.scrollTop;
-
         window.addEventListener('scroll', () => {
-          const afterScrollTop = document.body.scrollTop;
-          var delta = afterScrollTop - beforeScrollTop;
-
-          if (delta === 0) return false;
-
-          fn(delta > 0 ? 'down' : 'up');
-          beforeScrollTop = afterScrollTop;
+          fn();
         }, false);
       }
-      scroll((direction) => {
-        const bounding = this.$el.getBoundingClientRect();
-        if (bounding.bottom < 0) {
-          this.isFixed = true;
-          this.$nextTick(() => {
-            this.headerStyle.transition = 'all .5s ease';
-          });
+      scroll(() => {
+        if (this.isHome) {
+          const threshold = 200;
+          let alpha = Math.min((document.documentElement.scrollTop || document.body.scrollTop), threshold) / threshold;
+          this.$refs.header.style.backgroundColor = `rgba(32, 160, 255, ${ alpha })`;
         }
-        if (bounding.top === 0) {
-          this.isFixed = false;
-          this.$nextTick(() => {
-            this.headerStyle.transition = '';
-          });
-        }
-        this.hangUp = direction === 'up';
       });
     }
   };

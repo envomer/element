@@ -1,21 +1,22 @@
 <template>
   <label class="el-radio">
-    <span class="el-radio__input">
-      <span class="el-radio__inner"
-        :class="{
-        'is-disabled': disabled,
-        'is-checked': _value === label,
+    <span class="el-radio__input"
+      :class="{
+        'is-disabled': isDisabled,
+        'is-checked': model === label,
         'is-focus': focus
-      }"></span>
+      }"
+    >
+      <span class="el-radio__inner"></span>
       <input
         class="el-radio__original"
         :value="label"
         type="radio"
-        v-model="_value"
+        v-model="model"
         @focus="focus = true"
         @blur="focus = false"
         :name="name"
-        :disabled="disabled">
+        :disabled="isDisabled">
     </span>
     <span class="el-radio__label">
       <slot></slot>
@@ -24,35 +25,60 @@
   </label>
 </template>
 <script>
+  import Emitter from 'element-ui/src/mixins/emitter';
+
   export default {
     name: 'ElRadio',
 
+    mixins: [Emitter],
+
+    componentName: 'ElRadio',
+
     props: {
-      value: [String, Number],
-      label: {
-        type: [String, Number],
-        required: true
-      },
+      value: {},
+      label: {},
       disabled: Boolean,
       name: String
     },
+
     data() {
       return {
         focus: false
       };
     },
+
     computed: {
-      _value: {
-        get() {
-          return this.value !== undefined ? this.value : this.$parent.value;
-        },
-        set(newValue) {
-          if (this.value !== undefined) {
-            this.$emit('input', newValue);
+      isGroup() {
+        let parent = this.$parent;
+        while (parent) {
+          if (parent.$options.componentName !== 'ElRadioGroup') {
+            parent = parent.$parent;
           } else {
-            this.$parent.$emit('input', newValue);
+            this._radioGroup = parent;
+            return true;
           }
         }
+        return false;
+      },
+
+      model: {
+        get() {
+          return this.isGroup ? this._radioGroup.value : this.value;
+        },
+
+        set(val) {
+          if (this.isGroup) {
+            this.dispatch('ElRadioGroup', 'input', [val]);
+          } else {
+            this.$emit('input', val);
+          }
+        }
+      },
+
+      isDisabled() {
+        return this.isGroup
+          ? this._radioGroup.disabled || this.disabled
+          : this.disabled;
       }
     }
   };

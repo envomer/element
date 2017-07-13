@@ -1,53 +1,63 @@
 <template>
-  <div class="el-time-spinner">
-    {{hours}}
-    <div
-      @mouseenter="emitSelectRange('hours')"
+  <div class="el-time-spinner" :class="{ 'has-seconds': showSeconds }">
+    <el-scrollbar
+      @mouseenter.native="emitSelectRange('hours')"
       class="el-time-spinner__wrapper"
+      wrap-style="max-height: inherit;"
+      view-class="el-time-spinner__list"
+      noresize
+      tag="ul"
       ref="hour">
-      <ul class="el-time-spinner__list">
-        <li
-          @click="handleClick('hours', { value: hour, disabled: disabled }, true)"
-          v-for="(disabled, hour) in hoursList"
-          track-by="hour"
-          class="el-time-spinner__item"
-          :class="{ 'active': hour === hours, 'disabled': disabled }"
-          v-text="hour"></li>
-      </ul>
-    </div>
-    <div
-      @mouseenter="emitSelectRange('minutes')"
+      <li
+        @click="handleClick('hours', { value: hour, disabled: disabled }, true)"
+        v-for="(disabled, hour) in hoursList"
+        track-by="hour"
+        class="el-time-spinner__item"
+        :class="{ 'active': hour === hours, 'disabled': disabled }"
+        v-text="hour"></li>
+    </el-scrollbar>
+    <el-scrollbar
+      @mouseenter.native="emitSelectRange('minutes')"
       class="el-time-spinner__wrapper"
+      wrap-style="max-height: inherit;"
+      view-class="el-time-spinner__list"
+      noresize
+      tag="ul"
       ref="minute">
-      <ul class="el-time-spinner__list">
-        <li
-          @click="handleClick('minutes', key, true)"
-          v-for="(minute, key) in 60"
-          class="el-time-spinner__item"
-          :class="{ 'active': key === minutes }"
-          v-text="key"></li>
-      </ul>
-    </div>
-    <div
-      @mouseenter="emitSelectRange('seconds')"
+      <li
+        @click="handleClick('minutes', key, true)"
+        v-for="(minute, key) in 60"
+        class="el-time-spinner__item"
+        :class="{ 'active': key === minutes }"
+        v-text="key"></li>
+    </el-scrollbar>
+    <el-scrollbar
+      v-show="showSeconds"
+      @mouseenter.native="emitSelectRange('seconds')"
       class="el-time-spinner__wrapper"
+      wrap-style="max-height: inherit;"
+      view-class="el-time-spinner__list"
+      noresize
+      tag="ul"
       ref="second">
-      <ul class="el-time-spinner__list">
-        <li
-          @click="handleClick('seconds', key, true)"
-          v-for="(second, key) in 60"
-          class="el-time-spinner__item"
-          :class="{ 'active': key === seconds }"
-          v-text="key"></li>
-      </ul>
-    </div>
+      <li
+        @click="handleClick('seconds', key, true)"
+        v-for="(second, key) in 60"
+        class="el-time-spinner__item"
+        :class="{ 'active': key === seconds }"
+        v-text="key"></li>
+    </el-scrollbar>
   </div>
 </template>
 
-<script type="text/ecmascript-6">
+<script type="text/babel">
   import { getRangeHours } from '../util';
+  import ElScrollbar from 'element-ui/packages/scrollbar';
+  import debounce from 'throttle-debounce/debounce';
 
   export default {
+    components: { ElScrollbar },
+
     props: {
       hours: {
         type: Number,
@@ -75,8 +85,7 @@
         if (!(newVal >= 0 && newVal <= 23)) {
           this.hoursPrivate = oldVal;
         }
-        this.$refs.hour.scrollTop = Math.max(0, (this.hoursPrivate - 2.5) * 32 + 80);
-
+        this.ajustElTop('hour', newVal);
         this.$emit('change', { hours: newVal });
       },
 
@@ -84,7 +93,7 @@
         if (!(newVal >= 0 && newVal <= 59)) {
           this.minutesPrivate = oldVal;
         }
-        this.$refs.minute.scrollTop = Math.max(0, (this.minutesPrivate - 2.5) * 32 + 80);
+        this.ajustElTop('minute', newVal);
         this.$emit('change', { minutes: newVal });
       },
 
@@ -92,7 +101,7 @@
         if (!(newVal >= 0 && newVal <= 59)) {
           this.secondsPrivate = oldVal;
         }
-        this.$refs.second.scrollTop = Math.max(0, (this.secondsPrivate - 2.5) * 32 + 80);
+        this.ajustElTop('second', newVal);
         this.$emit('change', { seconds: newVal });
       }
     },
@@ -100,6 +109,18 @@
     computed: {
       hoursList() {
         return getRangeHours(this.selectableRange);
+      },
+
+      hourEl() {
+        return this.$refs.hour.wrap;
+      },
+
+      minuteEl() {
+        return this.$refs.minute.wrap;
+      },
+
+      secondEl() {
+        return this.$refs.second.wrap;
       }
     },
 
@@ -112,14 +133,17 @@
       };
     },
 
-    methods: {
-      focusEditor(type) {
-        const editor = this.$refs[type + 'Editor'];
-        if (editor) {
-          editor.focus();
-        }
-      },
+    created() {
+      this.debounceAjustElTop = debounce(100, type => this.ajustElTop(type, this[`${type}s`]));
+    },
 
+    mounted() {
+      this.$nextTick(() => {
+        this.bindScrollEvent();
+      });
+    },
+
+    methods: {
       handleClick(type, value, disabled) {
         if (value.disabled) {
           return;
@@ -140,10 +164,30 @@
         }
       },
 
+      bindScrollEvent() {
+        const bindFuntion = (type) => {
+          this[`${type}El`].onscroll = (e) => this.handleScroll(type, e);
+        };
+        bindFuntion('hour');
+        bindFuntion('minute');
+        bindFuntion('second');
+      },
+
+      handleScroll(type) {
+        const ajust = {};
+        ajust[`${type}s`] = Math.min(Math.floor((this[`${type}El`].scrollTop - 80) / 32 + 3), 59);
+        this.debounceAjustElTop(type);
+        this.$emit('change', ajust);
+      },
+
       ajustScrollTop() {
-        this.$refs.hour.scrollTop = Math.max(0, (this.hours - 2.5) * 32 + 80);
-        this.$refs.minute.scrollTop = Math.max(0, (this.minutes - 2.5) * 32 + 80);
-        this.$refs.second.scrollTop = Math.max(0, (this.seconds - 2.5) * 32 + 80);
+        this.ajustElTop('hour', this.hours);
+        this.ajustElTop('minute', this.minutes);
+        this.ajustElTop('second', this.seconds);
+      },
+
+      ajustElTop(type, value) {
+        this[`${type}El`].scrollTop = Math.max(0, (value - 2.5) * 32 + 80);
       }
     }
   };

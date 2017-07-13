@@ -2,19 +2,25 @@
 import UploadList from './upload-list';
 import Upload from './upload';
 import IframeUpload from './iframe-upload';
-import ElProgress from 'packages/progress/index.js';
+import ElProgress from 'element-ui/packages/progress';
+import Migrating from 'element-ui/src/mixins/migrating';
 
-function noop() {
-}
+function noop() {}
 
 export default {
-  name: 'el-upload',
+  name: 'ElUpload',
+
+  mixins: [Migrating],
 
   components: {
     ElProgress,
     UploadList,
     Upload,
     IframeUpload
+  },
+
+  provide: {
+    uploader: this
   },
 
   props: {
@@ -25,26 +31,19 @@ export default {
     headers: {
       type: Object,
       default() {
-        return {
-          // 'Access-Control-Request-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
-          // 'Access-Control-Request-Headers': 'Content-Type, Content-Range, Content-Disposition, Content-Description'
-        };
+        return {};
       }
     },
-    multiple: {
-      type: Boolean,
-      default: false
-    },
+    data: Object,
+    multiple: Boolean,
     name: {
       type: String,
       default: 'file'
     },
-    withCredentials: {
-      type: Boolean,
-      default: false
-    },
-    thumbnailMode: Boolean,
-    showUploadList: {
+    drag: Boolean,
+    dragger: Boolean,
+    withCredentials: Boolean,
+    showFileList: {
       type: Boolean,
       default: true
     },
@@ -63,154 +62,210 @@ export default {
       default: noop
     },
     onPreview: {
+      type: Function
+    },
+    onSuccess: {
       type: Function,
       default: noop
     },
-    onSuccess: {
+    onProgress: {
       type: Function,
       default: noop
     },
     onError: {
       type: Function,
       default: noop
-    }
+    },
+    fileList: {
+      type: Array,
+      default() {
+        return [];
+      }
+    },
+    autoUpload: {
+      type: Boolean,
+      default: true
+    },
+    listType: {
+      type: String,
+      default: 'text'   // text,picture,picture-card
+    },
+    httpRequest: Function,
+    disabled: Boolean
   },
 
   data() {
     return {
-      uploadedFiles: [],
+      uploadFiles: [],
       dragOver: false,
       draging: false,
       tempIndex: 1
     };
   },
 
+  watch: {
+    fileList: {
+      immediate: true,
+      handler(fileList) {
+        this.uploadFiles = fileList.map(item => {
+          item.uid = item.uid || (Date.now() + this.tempIndex++);
+          item.status = 'success';
+          return item;
+        });
+      }
+    }
+  },
+
   methods: {
-    handleStart(file) {
-      file.uid = Date.now() + this.tempIndex++;
-      let _file = {
-        status: 'uploading',
-        name: file.name,
-        size: file.size,
+    handleStart(rawFile) {
+      rawFile.uid = Date.now() + this.tempIndex++;
+      let file = {
+        status: 'ready',
+        name: rawFile.name,
+        size: rawFile.size,
         percentage: 0,
-        uid: file.uid,
-        showProgress: true
+        uid: rawFile.uid,
+        raw: rawFile
       };
 
-      if (this.thumbnailMode) {
-        try {
-          _file.url = URL.createObjectURL(file);
-        } catch (err) {
-          console.log(err);
-          return;
-        }
+      try {
+        file.url = URL.createObjectURL(rawFile);
+      } catch (err) {
+        console.error(err);
+        return;
       }
 
-      this.uploadedFiles.push(_file);
+      this.uploadFiles.push(file);
+      this.onChange(file, this.uploadFiles);
     },
-    handleProgress(ev, file) {
-      var _file = this.getFile(file);
-      _file.percentage = ev.percent;
+    handleProgress(ev, rawFile) {
+      var file = this.getFile(rawFile);
+      this.onProgress(ev, file, this.uploadFiles);
+      file.status = 'uploading';
+      file.percentage = ev.percent || 0;
     },
-    handleSuccess(res, file) {
-      var _file = this.getFile(file);
+    handleSuccess(res, rawFile) {
+      var file = this.getFile(rawFile);
 
-      if (_file) {
-        _file.status = 'finished';
-        _file.response = res;
+      if (file) {
+        file.status = 'success';
+        file.response = res;
 
-        this.onSuccess(_file, this.uploadedFiles);
-
-        setTimeout(() => {
-          _file.showProgress = false;
-        }, 1000);
+        this.onSuccess(res, file, this.uploadFiles);
+        this.onChange(file, this.uploadFiles);
       }
     },
-    handleError(err, file) {
-      var _file = this.getFile(file);
-      var fileList = this.uploadedFiles;
+    handleError(err, rawFile) {
+      var file = this.getFile(rawFile);
+      var fileList = this.uploadFiles;
 
-      _file.status = 'fail';
+      file.status = 'fail';
 
-      fileList.splice(fileList.indexOf(_file), 1);
+      fileList.splice(fileList.indexOf(file), 1);
 
-      this.onError(err, _file, fileList);
+      this.onError(err, file, this.uploadFiles);
+      this.onChange(file, this.uploadFiles);
     },
-    handleRemove(file) {
-      var fileList = this.uploadedFiles;
+    handleRemove(file, raw) {
+      if (raw) {
+        file = this.getFile(raw);
+      }
+      this.abort(file);
+      var fileList = this.uploadFiles;
       fileList.splice(fileList.indexOf(file), 1);
       this.onRemove(file, fileList);
     },
-    getFile(file) {
-      var fileList = this.uploadedFiles;
+    getFile(rawFile) {
+      var fileList = this.uploadFiles;
       var target;
       fileList.every(item => {
-        target = file.uid === item.uid ? item : null;
+        target = rawFile.uid === item.uid ? item : null;
         return !target;
       });
       return target;
     },
-    handlePreview(file) {
-      if (file.status === 'finished') {
-        this.onPreview(file);
-      }
+    abort(file) {
+      this.$refs['upload-inner'].abort(file);
+    },
+    clearFiles() {
+      this.uploadFiles = [];
+    },
+    submit() {
+      this.uploadFiles
+        .filter(file => file.status === 'ready')
+        .forEach(file => {
+          this.$refs['upload-inner'].upload(file.raw);
+        });
+    },
+    getMigratingConfig() {
+      return {
+        props: {
+          'default-file-list': 'default-file-list is renamed to file-list.',
+          'show-upload-list': 'show-upload-list is renamed to show-file-list.',
+          'thumbnail-mode': 'thumbnail-mode has been deprecated, you can implement the same effect according to this case: http://element.eleme.io/#/zh-CN/component/upload#yong-hu-tou-xiang-shang-chuan'
+        }
+      };
     }
   },
 
   render(h) {
     var uploadList;
 
-    if (this.showUploadList && !this.thumbnailMode) {
+    if (this.showFileList) {
       uploadList = (
         <UploadList
-          files={this.uploadedFiles}
+          listType={this.listType}
+          files={this.uploadFiles}
           on-remove={this.handleRemove}
-          on-preview={this.handlePreview}>
+          handlePreview={this.onPreview}>
         </UploadList>
       );
     }
 
-    var props = {
+    var uploadData = {
       props: {
         type: this.type,
+        drag: this.drag,
         action: this.action,
         multiple: this.multiple,
         'before-upload': this.beforeUpload,
         'with-credentials': this.withCredentials,
+        headers: this.headers,
         name: this.name,
-        accept: this.thumbnailMode ? 'image/*' : this.accept,
+        data: this.data,
+        accept: this.accept,
+        fileList: this.uploadFiles,
+        autoUpload: this.autoUpload,
+        listType: this.listType,
+        disabled: this.disabled,
         'on-start': this.handleStart,
         'on-progress': this.handleProgress,
         'on-success': this.handleSuccess,
         'on-error': this.handleError,
-        'on-preview': this.handlePreview,
-        'on-remove': this.handleRemove
-      }
+        'on-preview': this.onPreview,
+        'on-remove': this.handleRemove,
+        'http-request': this.httpRequest
+      },
+      ref: 'upload-inner'
     };
 
-    var uploadComponent = typeof FormData !== 'undefined'
-      ? <upload {...props}>{this.$slots.default}</upload>
-      : <iframeUpload {...props}>{this.$slots.default}</iframeUpload>;
+    const trigger = this.$slots.trigger || this.$slots.default;
+    const uploadComponent = (typeof FormData !== 'undefined' || this.$isServer)
+        ? <upload {...uploadData}>{trigger}</upload>
+        : <iframeUpload {...uploadData}>{trigger}</iframeUpload>;
 
-    if (this.type === 'select') {
-      return (
-        <div class="el-upload">
-          {uploadList}
-          {uploadComponent}
-          {this.$slots.tip}
-        </div>
-      );
-    }
-
-    if (this.type === 'drag') {
-      return (
-        <div class="el-upload">
-          {uploadComponent}
-          {this.$slots.tip}
-          {uploadList}
-        </div>
-      );
-    }
+    return (
+      <div>
+        { this.listType === 'picture-card' ? uploadList : ''}
+        {
+          this.$slots.trigger
+          ? [uploadComponent, this.$slots.default]
+          : uploadComponent
+        }
+        {this.$slots.tip}
+        { this.listType !== 'picture-card' ? uploadList : ''}
+      </div>
+    );
   }
 };
 </script>

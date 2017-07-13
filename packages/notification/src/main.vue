@@ -1,11 +1,22 @@
 <template>
   <transition name="el-notification-fade">
-    <div class="el-notification" v-show="visible" :style="{ top: top ? top + 'px' : 'auto' }" @mouseenter="clearTimer()" @mouseleave="startTimer()">
-      <i class="el-notification__icon" :class="[ typeClass ]" v-if="type"></i>
-      <div class="el-notification__group" :style="{ 'margin-left': typeClass ? '55px' : '0' }">
-        <span>{{ title }}</span>
-        <p>{{ message }}</p>
-        <div class="el-notification__closeBtn el-icon-close" @click="handleClose()"></div>
+    <div
+      class="el-notification"
+      :class="customClass"
+      v-show="visible"
+      :style="{ top: top ? top + 'px' : 'auto' }"
+      @mouseenter="clearTimer()"
+      @mouseleave="startTimer()"
+      @click="click">
+      <i
+        class="el-notification__icon"
+        :class="[ typeClass, iconClass ]"
+        v-if="type || iconClass">
+      </i>
+      <div class="el-notification__group" :class="{ 'is-with-icon': typeClass || iconClass }">
+        <h2 class="el-notification__title" v-text="title"></h2>
+        <div class="el-notification__content"><slot>{{ message }}</slot></div>
+        <div class="el-notification__closeBtn el-icon-close" @click.stop="close"></div>
       </div>
     </div>
   </transition>
@@ -27,7 +38,10 @@
         message: '',
         duration: 4500,
         type: '',
+        customClass: '',
+        iconClass: '',
         onClose: null,
+        onClick: null,
         closed: false,
         top: null,
         timer: null
@@ -44,16 +58,25 @@
       closed(newVal) {
         if (newVal) {
           this.visible = false;
-          this.$el.addEventListener('transitionend', () => {
-            this.$destroy(true);
-            this.$el.parentNode.removeChild(this.$el);
-          });
+          this.$el.addEventListener('transitionend', this.destroyElement);
         }
       }
     },
 
     methods: {
-      handleClose() {
+      destroyElement() {
+        this.$el.removeEventListener('transitionend', this.destroyElement);
+        this.$destroy(true);
+        this.$el.parentNode.removeChild(this.$el);
+      },
+
+      click() {
+        if (typeof this.onClick === 'function') {
+          this.onClick();
+        }
+      },
+
+      close() {
         this.closed = true;
         if (typeof this.onClose === 'function') {
           this.onClose();
@@ -68,7 +91,7 @@
         if (this.duration > 0) {
           this.timer = setTimeout(() => {
             if (!this.closed) {
-              this.handleClose();
+              this.close();
             }
           }, this.duration);
         }
@@ -79,7 +102,7 @@
       if (this.duration > 0) {
         this.timer = setTimeout(() => {
           if (!this.closed) {
-            this.handleClose();
+            this.close();
           }
         }, this.duration);
       }

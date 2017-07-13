@@ -1,9 +1,9 @@
 <script>
-import Cover from './cover';
+import UploadDragger from './upload-dragger.vue';
 
 export default {
   components: {
-    Cover
+    UploadDragger
   },
   props: {
     type: String,
@@ -17,7 +17,6 @@ export default {
       default: 'file'
     },
     withCredentials: Boolean,
-    multiple: Boolean,
     accept: String,
     onStart: Function,
     onProgress: Function,
@@ -31,60 +30,22 @@ export default {
     onRemove: {
       type: Function,
       default: function() {}
-    }
+    },
+    drag: Boolean,
+    listType: String,
+    disabled: Boolean
   },
 
   data() {
     return {
-      dragOver: false,
       mouseover: false,
       domain: '',
       file: null,
-      disabled: false
+      submitting: false
     };
   },
 
-  computed: {
-    lastestFile() {
-      var uploadedFiles = this.$parent.uploadedFiles;
-      return uploadedFiles[uploadedFiles.length - 1];
-    },
-    showCover() {
-      var file = this.lastestFile;
-      return this.thumbnailMode && file && file.status !== 'fail';
-    },
-    thumbnailMode() {
-      return this.$parent.thumbnailMode;
-    }
-  },
-
   methods: {
-    resetIframe() {
-      const iframeNode = this.getIframeNode();
-      let win = iframeNode.contentWindow;
-      let doc = win.document;
-
-      doc.open('text/html', 'replace');
-      doc.write(this.getIframeHTML(this.domain));
-      doc.close();
-    },
-    getIframeHTML(domain) {
-      let domainScript = '';
-      if (domain) {
-        domainScript = `<script>document.domain="${domain}";<` + '/script>';
-      }
-      return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-      <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-      ${domainScript}
-      </head>
-      <body>
-      </body>
-      </html>
-      `;
-    },
     isImage(str) {
       return str.indexOf('image') !== -1;
     },
@@ -94,16 +55,22 @@ export default {
       }
     },
     handleChange(ev) {
-      const files = ev.target.files;
-      this.file = files;
-
-      this.onStart(files);
+      const file = ev.target.value;
+      if (file) {
+        this.uploadFiles(file);
+      }
+    },
+    uploadFiles(file) {
+      if (this.submitting) return;
+      this.submitting = true;
+      this.file = file;
+      this.onStart(file);
 
       const formNode = this.getFormNode();
       const dataSpan = this.getFormDataNode();
       let data = this.data;
       if (typeof data === 'function') {
-        data = data(files);
+        data = data(file);
       }
       const inputs = [];
       for (const key in data) {
@@ -114,77 +81,58 @@ export default {
       dataSpan.innerHTML = inputs.join('');
       formNode.submit();
       dataSpan.innerHTML = '';
-      this.disabled = true;
     },
-    onLoad() {
-      let response;
-      const eventFile = this.file;
-      if (!eventFile) { return; }
-      try {
-        const doc = this.getIframeDocument();
-        const script = doc.getElementsByTagName('script')[0];
-        if (script && script.parentNode === doc.body) {
-          doc.body.removeChild(script);
-        }
-        response = doc.body.innerHTML;
-        this.onSuccess(response, eventFile);
-      } catch (err) {
-        console.log(err);
-        console.warn(false, 'cross domain error for Upload');
-        this.onError(err, eventFile);
-      }
-      this.resetIframe();
-      this.disabled = false;
-    },
-    onDrop(e) {
-      e.preventDefault();
-      this.dragOver = false;
-      this.uploadFiles(e.dataTransfer.files);
-    },
-    handleDragover(e) {
-      e.preventDefault();
-      this.onDrop = true;
-    },
-    handleDragleave(e) {
-      e.preventDefault();
-      this.onDrop = false;
-    },
-    getIframeNode() {
-      return this.$refs.iframe;
-    },
-
-    getIframeDocument() {
-      return this.getIframeNode().contentDocument;
-    },
-
     getFormNode() {
       return this.$refs.form;
     },
-
     getFormDataNode() {
       return this.$refs.data;
     }
   },
 
+  created() {
+    this.frameName = 'frame-' + Date.now();
+  },
+
+  mounted() {
+    const self = this;
+    !this.$isServer && window.addEventListener('message', (event) => {
+      if (!self.file) return;
+      var targetOrigin = new URL(self.action).origin;
+      if (event.origin !== targetOrigin) return;
+      var response = event.data;
+      if (response.result === 'success') {
+        self.onSuccess(response, self.file);
+      } else if (response.result === 'failed') {
+        self.onError(response, self.file);
+      }
+      self.submitting = false;
+      self.file = null;
+    }, false);
+  },
+
   render(h) {
-    var cover = <cover image={this.lastestFile} onPreview={this.onPreview} onRemove={this.onRemove}></cover>;
-    var frameName = 'frame-' + Date.now();
+    const {
+      drag,
+      uploadFiles,
+      listType,
+      frameName,
+      disabled
+    } = this;
+    const oClass = { 'el-upload': true };
+    oClass[`el-upload--${listType}`] = true;
+
     return (
       <div
-        class={{
-          'el-upload__inner': true,
-          'el-dragger': this.type === 'drag',
-          'is-dragOver': this.dragOver,
-          'is-showCover': this.showCover
-        }}
+        class={oClass}
         on-click={this.handleClick}
         nativeOn-drop={this.onDrop}
         nativeOn-dragover={this.handleDragover}
         nativeOn-dragleave={this.handleDragleave}
       >
         <iframe
+          on-load={this.onload}
           ref="iframe"
-          on-load={this.onLoad}
           name={frameName}
         >
         </iframe>
@@ -195,13 +143,16 @@ export default {
             ref="input"
             name="file"
             on-change={this.handleChange}
-            multiple={this.multiple}
             accept={this.accept}>
           </input>
-          <input type="hidden" name="documentDomain" value={document.domain} />
+          <input type="hidden" name="documentDomain" value={ this.$isServer ? '' : document.domain } />
           <span ref="data"></span>
-         </form>
-        {!this.showCover ? this.$slots.default : cover}
+        </form>
+        {
+          drag
+          ? <upload-dragger on-file={uploadFiles} disabled={disabled}>{this.$slots.default}</upload-dragger>
+          : this.$slots.default
+        }
       </div>
     );
   }
